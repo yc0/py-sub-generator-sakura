@@ -1,0 +1,35 @@
+{
+  "asr": {
+    "model_name": "openai/whisper-large-v3",
+    "device": "auto",
+    "batch_size": 1,
+    "language": "ja",
+    "return_timestamps": true,
+    "chunk_length": 30,
+    "overlap": 1.0
+  },
+  "translation": {
+    "ja_to_en_model": "Helsinki-NLP/opus-mt-ja-en",
+    "en_to_zh_model": "Helsinki-NLP/opus-mt-en-zh", 
+    "device": "auto",
+    "batch_size": 8,
+    "max_length": 512
+  },
+  "ui": {
+    "window_title": "Sakura Subtitle Generator",
+    "window_size": "800x600",
+    "theme": "default",
+    "progress_update_interval": 100
+  },
+  "output": {
+    "default_format": "srt",
+    "include_confidence": true,
+    "output_directory": "outputs",
+    "temp_directory": "temp"
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "logs/app.log"
+  }
+}

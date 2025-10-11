@@ -1,0 +1,156 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-sub-generator-sakura"
+version = "1.0.0"
+description = "🌸 Sakura Subtitle Generator - Japanese ASR with Multi-language Translation"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Nelson Lin", email = "nelson.lin.tw@gmail.com"}
+]
+keywords = ["subtitle", "asr", "translation", "japanese", "whisper", "ml"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License", 
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Text Processing :: Linguistic",
+]
+
+dependencies = [
+    # Core ML libraries
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "datasets>=2.0.0",
+    
+    # Audio processing
+    "librosa>=0.10.0",
+    "ffmpeg-python>=0.2.0",
+    
+    # ASR and NLP
+    "accelerate>=0.20.0",
+    "sentencepiece>=0.1.99",
+    "sacremoses>=0.0.53",
+    
+    # Utilities
+    "numpy>=1.21.0",
+    "tqdm>=4.65.0",
+    
+    # Optional optimizations
+    "optimum[onnxruntime]>=1.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+    "ruff>=0.0.280",
+]
+
+gpu = [
+    "torch>=2.0.0,<3.0.0",
+    "torchvision>=0.15.0",
+    "torchaudio>=2.0.0",
+]
+
+# Apple Silicon optimized dependencies
+apple-silicon = [
+    "torch>=2.0.0,<3.0.0",
+    "torchvision>=0.15.0", 
+    "torchaudio>=2.0.0",
+    # Metal Performance Shaders optimizations
+    "accelerate>=0.20.0",
+    # Optimized for ARM64 architecture
+    "scipy>=1.10.0",
+    "scikit-learn>=1.3.0",
+    # Fast tokenizers with ARM64 support
+    "tokenizers>=0.13.0",
+]
+
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+]
+
+all = [
+    "py-sub-generator-sakura[dev,gpu,test]"
+]
+
+all-apple = [
+    "py-sub-generator-sakura[dev,apple-silicon,test]"
+]
+
+[project.urls]
+Homepage = "https://github.com/yc0/py-sub-generator-sakura"
+Repository = "https://github.com/yc0/py-sub-generator-sakura.git"
+"Bug Tracker" = "https://github.com/yc0/py-sub-generator-sakura/issues"
+
+[project.scripts]
+sakura-subtitle = "main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# UV-specific configuration
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0", 
+    "mypy>=1.0.0",
+    "ruff>=0.0.280",
+]
+
+# Development tools configuration
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+select = ["E", "F", "W", "B", "I", "N", "UP"]
+ignore = ["E203", "E501"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+    "--cov=src",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+]
