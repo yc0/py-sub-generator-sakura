@@ -705,6 +705,26 @@ If you're limited to CPU-only inference:
 - [ ] Docker deployment
 - [ ] Additional language pairs
 
+## 📚 Documentation
+
+### 📋 Project Documentation
+- **[Progress Summary](PROGRESS_SUMMARY.md)** - Complete overview of recent improvements and transformations
+- **[Technical Changelog](TECHNICAL_CHANGELOG.md)** - Detailed technical implementation documentation
+
+### 🚀 Recent Major Updates
+- **Native Whisper Implementation** - Refactored from pipeline to native `generate()` method
+- **Zero Experimental Warnings** - Eliminated all ASR warnings for clean operation  
+- **Production Ready** - Following Whisper paper best practices (Section 3.8)
+- **Performance Optimized** - Better memory usage and generation efficiency
+
+### 🎯 Key Improvements
+- ✅ **No Token Limits** - Removed artificial generation constraints
+- ✅ **Silent Operation** - Clean logs without experimental warnings
+- ✅ **Better Quality** - Using Whisper's intended architecture
+- ✅ **Full Device Support** - Maintained MPS/CUDA/CPU compatibility
+
+*For complete technical details, see [TECHNICAL_CHANGELOG.md](TECHNICAL_CHANGELOG.md)*
+
 ## 🤝 Contributing
 
 The codebase is designed for extensibility:
