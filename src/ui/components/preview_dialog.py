@@ -26,7 +26,17 @@ class PreviewDialog:
         # Create dialog
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Subtitle Preview")
-        self.dialog.geometry("900x700")
+        
+        # Calculate responsive dialog size
+        screen_width = self.dialog.winfo_screenwidth()
+        screen_height = self.dialog.winfo_screenheight()
+        
+        # Use 80% of screen dimensions or reasonable defaults
+        dialog_width = min(900, int(screen_width * 0.8))
+        dialog_height = min(700, int(screen_height * 0.8))
+        
+        self.dialog.geometry(f"{dialog_width}x{dialog_height}")
+        self.dialog.minsize(600, 400)
         self.dialog.resizable(True, True)
         self.dialog.transient(parent)
         
@@ -40,19 +50,34 @@ class PreviewDialog:
         self.load_preview()
     
     def center_on_parent(self):
-        """Center dialog on parent window."""
+        """Center dialog on parent window, ensuring it fits on screen."""
         self.dialog.update_idletasks()
         
-        parent_x = self.parent.winfo_rootx()
-        parent_y = self.parent.winfo_rooty()
-        parent_width = self.parent.winfo_width()
-        parent_height = self.parent.winfo_height()
+        # Get screen dimensions
+        screen_width = self.dialog.winfo_screenwidth()
+        screen_height = self.dialog.winfo_screenheight()
         
+        # Get dialog dimensions
         dialog_width = self.dialog.winfo_width()
         dialog_height = self.dialog.winfo_height()
         
-        x = parent_x + (parent_width // 2) - (dialog_width // 2)
-        y = parent_y + (parent_height // 2) - (dialog_height // 2)
+        # Try to center on parent
+        try:
+            parent_x = self.parent.winfo_rootx()
+            parent_y = self.parent.winfo_rooty()
+            parent_width = self.parent.winfo_width()
+            parent_height = self.parent.winfo_height()
+            
+            x = parent_x + (parent_width // 2) - (dialog_width // 2)
+            y = parent_y + (parent_height // 2) - (dialog_height // 2)
+        except:
+            # Fallback to screen center
+            x = (screen_width // 2) - (dialog_width // 2)
+            y = (screen_height // 2) - (dialog_height // 2)
+        
+        # Ensure dialog stays within screen bounds
+        x = max(0, min(x, screen_width - dialog_width))
+        y = max(0, min(y, screen_height - dialog_height))
         
         self.dialog.geometry(f"+{x}+{y}")
     

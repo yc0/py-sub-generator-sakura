@@ -27,7 +27,18 @@ class SettingsDialog:
         # Create dialog
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Settings")
-        self.dialog.geometry("500x600")
+        
+        # Calculate responsive dialog size based on screen resolution
+        screen_width = self.dialog.winfo_screenwidth()
+        screen_height = self.dialog.winfo_screenheight()
+        
+        # Use 70% of screen height or minimum 700px, whichever is larger
+        dialog_height = max(700, int(screen_height * 0.7))
+        # Use 600px width or 40% of screen width, whichever is smaller
+        dialog_width = min(600, int(screen_width * 0.4))
+        
+        self.dialog.geometry(f"{dialog_width}x{dialog_height}")
+        self.dialog.minsize(550, 650)  # Ensure minimum usable size
         self.dialog.resizable(True, True)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -42,31 +53,81 @@ class SettingsDialog:
         self.load_settings()
     
     def center_on_parent(self):
-        """Center dialog on parent window."""
+        """Center dialog on parent window, ensuring it fits on screen."""
         self.dialog.update_idletasks()
         
-        parent_x = self.parent.winfo_rootx()
-        parent_y = self.parent.winfo_rooty()
-        parent_width = self.parent.winfo_width()
-        parent_height = self.parent.winfo_height()
+        # Get screen dimensions
+        screen_width = self.dialog.winfo_screenwidth()
+        screen_height = self.dialog.winfo_screenheight()
         
+        # Get dialog dimensions
         dialog_width = self.dialog.winfo_width()
         dialog_height = self.dialog.winfo_height()
         
-        x = parent_x + (parent_width // 2) - (dialog_width // 2)
-        y = parent_y + (parent_height // 2) - (dialog_height // 2)
+        # Try to center on parent if parent is visible
+        try:
+            parent_x = self.parent.winfo_rootx()
+            parent_y = self.parent.winfo_rooty()
+            parent_width = self.parent.winfo_width()
+            parent_height = self.parent.winfo_height()
+            
+            x = parent_x + (parent_width // 2) - (dialog_width // 2)
+            y = parent_y + (parent_height // 2) - (dialog_height // 2)
+        except:
+            # Fallback to screen center
+            x = (screen_width // 2) - (dialog_width // 2)
+            y = (screen_height // 2) - (dialog_height // 2)
+        
+        # Ensure dialog stays within screen bounds
+        x = max(0, min(x, screen_width - dialog_width))
+        y = max(0, min(y, screen_height - dialog_height))
         
         self.dialog.geometry(f"+{x}+{y}")
     
     def create_widgets(self):
         """Create dialog widgets."""
-        # Main frame with scrollbar
+        # Main container frame
         main_frame = ttk.Frame(self.dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
+        # Create scrollable frame for the notebook
+        canvas = tk.Canvas(main_frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # Configure scrolling
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack scrollable components
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
         # Create notebook for tabs
-        notebook = ttk.Notebook(main_frame)
+        notebook = ttk.Notebook(scrollable_frame)
         notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        # Enable mouse wheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def _bind_to_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+            
+        def _unbind_from_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+            
+        canvas.bind('<Enter>', _bind_to_mousewheel)
+        canvas.bind('<Leave>', _unbind_from_mousewheel)
+        
+        # Store references for button frame
+        self.main_frame = main_frame
+        self.scrollable_frame = scrollable_frame
         
         # ASR Settings Tab
         self.create_asr_tab(notebook)
@@ -80,9 +141,9 @@ class SettingsDialog:
         # UI Settings Tab
         self.create_ui_tab(notebook)
         
-        # Button frame
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(10, 0))
+        # Button frame (outside scrollable area)
+        button_frame = ttk.Frame(self.dialog)
+        button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(5, 10))
         
         # Buttons
         ttk.Button(

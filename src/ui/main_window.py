@@ -62,6 +62,33 @@ class MainWindow(LoggerMixin):
         self.style = ttk.Style()
         self.style.theme_use(ui_config.get("theme", "default"))
     
+    def apply_ui_settings(self):
+        """Apply UI settings from current configuration."""
+        try:
+            ui_config = self.config.get_ui_config()
+            
+            # Update window title if changed
+            current_title = self.root.title()
+            new_title = ui_config.get("window_title", "Sakura Subtitle Generator")
+            if current_title != new_title:
+                self.root.title(new_title)
+            
+            # Update theme if changed
+            current_theme = self.style.theme_use()
+            new_theme = ui_config.get("theme", "default")
+            if current_theme != new_theme:
+                try:
+                    self.style.theme_use(new_theme)
+                    self.logger.info(f"Theme changed to: {new_theme}")
+                except tk.TclError:
+                    self.logger.warning(f"Theme '{new_theme}' not available, keeping '{current_theme}'")
+            
+            # Note: Window size changes require restart to take full effect
+            # as resizing programmatically during runtime can be disruptive
+            
+        except Exception as e:
+            self.logger.error(f"Error applying UI settings: {e}")
+    
     def create_widgets(self):
         """Create and arrange GUI widgets."""
         # Main container
@@ -515,8 +542,13 @@ class MainWindow(LoggerMixin):
         try:
             dialog = SettingsDialog(self.root, self.config)
             if dialog.show():
-                # Settings were changed, reload configuration
+                # Settings were changed, reload configuration from file
+                self.config.load_config()
+                # Reinitialize components with updated configuration
                 self.subtitle_generator = SubtitleGenerator(self.config)
+                # Apply UI changes
+                self.apply_ui_settings()
+                self.logger.info("🔄 Configuration reloaded after settings change")
         except Exception as e:
             self.logger.error(f"Error showing settings: {e}")
             messagebox.showerror("Error", f"Failed to show settings: {e}")
