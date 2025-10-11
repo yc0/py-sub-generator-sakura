@@ -91,13 +91,30 @@
 
 ---
 
-## 📈 **Commit History (Latest Session)**
+### 4. �️ **Project-Scoped Development Tool Management**
 
-1. **f622e86** - `feat: Refactor to Whisper native generate() method - eliminate experimental warnings`
-2. **816e19b** - `chore: Add coverage.xml to .gitignore`
-3. **4fcf574** - `fix: Improve dialog sizing and prevent bottom cutoff issues`
-4. **99874e1** - `feat: Update project configuration and documentation for v2.0 release`
-5. **0f7c9bd** - `test: Add comprehensive test suite with 71 tests covering all components`
+#### **Clean Tool Philosophy:**
+- **Zero Global Pollution**: Eliminated all global uv tool installations 
+- **On-Demand Execution**: Tools run via `uv tool run toolname@latest` without permanent installation
+- **User-Aligned Approach**: Respects preference for clean global environment
+- **Latest Versions Always**: No tool maintenance overhead
+
+#### **Implementation:**
+- **Makefile Updates**: All commands use project-scoped execution (`make lint`, `format`, `typecheck`)
+- **Configuration Preservation**: Tool configs remain in pyproject.toml for consistency
+- **Documentation**: Comprehensive UV_TOOL_STRATEGY.md with pollution avoidance guide
+
+---
+
+## �📈 **Commit History (Latest Session)**
+
+1. **6aa5428** - `refactor: Update to project-scoped uv tool approach`
+2. **814f7c3** - `docs: Add comprehensive explanation of uv tool strategy`  
+3. **f622e86** - `feat: Refactor to Whisper native generate() method - eliminate experimental warnings`
+4. **816e19b** - `chore: Add coverage.xml to .gitignore`
+5. **4fcf574** - `fix: Improve dialog sizing and prevent bottom cutoff issues`
+6. **99874e1** - `feat: Update project configuration and documentation for v2.0 release`
+7. **0f7c9bd** - `test: Add comprehensive test suite with 71 tests covering all components`
 
 ---
 
