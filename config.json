@@ -6,7 +6,16 @@
     "language": "ja",
     "return_timestamps": true,
     "chunk_length": 30,
-    "overlap": 1.0
+    "overlap": 1.0,
+    "stride_length_s": 1.0,
+    "max_new_tokens": 128,
+    "ignore_warning": true,
+    "generate_kwargs": {
+      "return_timestamps": true,
+      "num_beams": 1,
+      "do_sample": false,
+      "forced_decoder_ids": null
+    }
   },
   "translation": {
     "ja_to_en_model": "Helsinki-NLP/opus-mt-ja-en",
