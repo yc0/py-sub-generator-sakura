@@ -374,10 +374,12 @@ src/
 
 ## 🙏 致謝
 
-- OpenAI 提供 Whisper ASR 模型
-- Hugging Face 提供 transformer 模型和管線 API
-- Helsinki-NLP 提供翻譯模型
-- FFmpeg 專案提供音頻處理
+- **OpenAI** 提供 Whisper ASR 模型和基礎研究
+- **Whisper 論文（第 3.8 節）** - "Robust Speech Recognition via Large-Scale Weak Supervision" 提供實作方法論和最佳實務
+- **SakuraLLM 專案** 提供針對輕小說和動漫內容最佳化的專業日中翻譯模型
+- **Hugging Face** 提供 transformer 模型和管線 API
+- **Helsinki-NLP** 提供 OPUS-MT 翻譯模型
+- **FFmpeg 專案** 提供全面的音頻處理能力
 
 ---
 

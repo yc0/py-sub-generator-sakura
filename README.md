@@ -789,10 +789,12 @@ The codebase is designed for extensibility:
 
 ## 🙏 Acknowledgments
 
-- OpenAI for Whisper ASR models
-- Hugging Face for transformer models and pipeline APIs
-- Helsinki-NLP for translation models
-- FFmpeg project for audio processing
+- **OpenAI** for Whisper ASR models and the foundational research
+- **Whisper Paper (Section 3.8)** - "Robust Speech Recognition via Large-Scale Weak Supervision" for implementation methodology and best practices
+- **SakuraLLM Project** for specialized Japanese-to-Chinese translation models optimized for light novel and anime content
+- **Hugging Face** for transformer models and pipeline APIs
+- **Helsinki-NLP** for OPUS-MT translation models
+- **FFmpeg Project** for comprehensive audio processing capabilities
 
 ---
 
