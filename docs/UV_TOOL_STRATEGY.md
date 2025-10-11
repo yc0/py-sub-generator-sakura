@@ -116,14 +116,32 @@ dev = [
 ```
 **Why?** These are project-specific and need to integrate with the codebase.
 
-### 🔨 **What Moves to `uv tool`**
+### 🔨 **What Moves to `uv tool run` (Project-Scoped)**
 ```bash
-uv tool install ruff     # Linter/formatter
-uv tool install black    # Code formatter
-uv tool install isort    # Import sorter
-uv tool install mypy     # Type checker
+# No global installation needed! 
+uv tool run ruff@latest check src/     # Use latest version temporarily
+uv tool run black@23.0.0 src/          # Use specific version
+uv tool run isort src/                 # Use latest from PyPI
+uv tool run mypy src/                  # No permanent installation
 ```
-**Why?** These are generic tools that work the same across all Python projects.
+**Why?** These tools run in isolation without affecting your global environment or project dependencies.
+
+### 🛡️ **Avoiding Global Pollution**
+```bash
+# ✅ CORRECT: Project-scoped execution (no global installation)
+uv tool run ruff@latest check .
+uv tool run black@23.0.0 src/
+uv tool run mypy@latest src/
+
+# ❌ AVOID: Global installation (pollutes environment)
+uv tool install ruff            # Creates permanent global installation
+uv tool install black           # Clutters global tool environment
+uv tool install huggingface-hub # Better to use on-demand
+
+# 🔍 Check your global environment
+uv tool list                    # See what's globally installed
+uv tool uninstall toolname     # Clean up if needed
+```
 
 ### 🎯 **Usage Pattern**
 ```makefile

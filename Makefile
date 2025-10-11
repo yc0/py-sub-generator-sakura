@@ -79,33 +79,16 @@ install-all:
 	@echo "📦 Installing all dependencies..."
 	uv sync --all-extras
 
-# Development tools (managed separately via uv tool)
-install-tools:
-	@echo "🔧 Installing development tools with uv tool..."
-	@echo "  📏 Installing ruff (linter & formatter)..."
-	@uv tool install ruff
-	@echo "  🎨 Installing black (code formatter)..."  
-	@uv tool install black
-	@echo "  📋 Installing isort (import sorter)..."
-	@uv tool install isort
-	@echo "  🔍 Installing mypy (type checker)..."
-	@uv tool install mypy
-	@echo "✅ Development tools installed globally with uv tool!"
-
-update-tools:
-	@echo "⬆️  Updating development tools..."
-	@uv tool upgrade ruff || echo "ruff not installed, skipping"
-	@uv tool upgrade black || echo "black not installed, skipping"  
-	@uv tool upgrade isort || echo "isort not installed, skipping"
-	@uv tool upgrade mypy || echo "mypy not installed, skipping"
-	@echo "✅ Development tools updated!"
-
+# Development tools (project-scoped via uv tool run - no global installation!)
 check-tools:
-	@echo "🔍 Checking development tools..."
-	@echo -n "  ruff: " && (uv tool run ruff --version 2>/dev/null || echo "❌ Not installed")
-	@echo -n "  black: " && (uv tool run black --version 2>/dev/null || echo "❌ Not installed")
-	@echo -n "  isort: " && (uv tool run isort --version 2>/dev/null || echo "❌ Not installed") 
-	@echo -n "  mypy: " && (uv tool run mypy --version 2>/dev/null || echo "❌ Not installed")
+	@echo "� Checking development tools (project-scoped)..."
+	@echo "  📏 ruff: Available via 'uv tool run ruff'"
+	@echo "  🎨 black: Available via 'uv tool run black'"
+	@echo "  📋 isort: Available via 'uv tool run isort'"
+	@echo "  🔍 mypy: Available via 'uv tool run mypy'"
+	@echo ""
+	@echo "💡 Tools are used on-demand without global installation!"
+	@echo "   This keeps your global environment clean while providing access to latest versions."
 
 # Development commands
 format:
@@ -113,10 +96,35 @@ format:
 	@uv tool run black src/ tests/ --line-length 88
 	@uv tool run isort src/ tests/ --profile black
 
+# Code quality checks (project-scoped tools)
 lint:
-	@echo "🔍 Running linters..."
-	@uv tool run ruff check src/ tests/
-	@uv tool run mypy src/ --ignore-missing-imports
+	@echo "🔍 Running comprehensive code quality checks..."
+	@echo "  📏 Running ruff linter..."
+	@uv tool run ruff@latest check . --config pyproject.toml
+	@echo "  🎨 Running black formatter check..."
+	@uv tool run black@latest --check --diff --config pyproject.toml .
+	@echo "  📋 Running isort import sorting check..."  
+	@uv tool run isort@latest --check-only --diff --settings-path pyproject.toml .
+	@echo "  🔍 Running mypy type checking..."
+	@uv tool run mypy@latest --config-file pyproject.toml src/
+	@echo "✅ All code quality checks passed!"
+
+# Code formatting and fixing (project-scoped tools)
+format:
+	@echo "🎨 Formatting code with project-scoped tools..."
+	@echo "  📏 Auto-fixing with ruff..."
+	@uv tool run ruff@latest check . --fix --config pyproject.toml
+	@echo "  🎨 Formatting with black..."
+	@uv tool run black@latest --config pyproject.toml .
+	@echo "  📋 Sorting imports with isort..."
+	@uv tool run isort@latest --settings-path pyproject.toml .
+	@echo "✅ Code formatted successfully!"
+
+# Type checking only (project-scoped tools)
+typecheck:
+	@echo "🔍 Running type checking with project-scoped mypy..."
+	@uv tool run mypy@latest --config-file pyproject.toml src/
+	@echo "✅ Type checking completed!"
 
 lint-fix:
 	@echo "🔧 Auto-fixing lint issues..."

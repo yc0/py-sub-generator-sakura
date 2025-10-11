@@ -52,8 +52,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Development tools are now managed via `uv tool` - see Makefile
-# This keeps the project environment clean and prevents version conflicts
+# Development tools are managed via project-scoped `uv tool run` - see Makefile
+# This keeps the project environment clean without global installation
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -120,10 +120,10 @@ dev = [
 
 # UV-specific configuration
 [tool.uv]
-# Development tools (ruff, black, isort, mypy) are managed via `uv tool`
-# This approach keeps them separate from project dependencies, preventing
-# version conflicts and keeping the project environment clean.
-# Use: make install-tools
+# Development tools (ruff, black, isort, mypy) are managed via project-scoped `uv tool run`
+# This approach keeps them separate from project dependencies while avoiding global installation.
+# Tools are executed on-demand via: uv tool run <tool>@latest
+# Use: make lint, make format, make typecheck
 
 # Development tools configuration
 [tool.black]
