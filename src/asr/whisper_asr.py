@@ -712,9 +712,14 @@ class WhisperASR(BaseASR, LoggerMixin):
 
     def unload_model(self):
         """Unload Whisper model and free memory."""
-        if self.pipeline is not None:
-            del self.pipeline
-            self.pipeline = None
+        # Clean up native Whisper components
+        if hasattr(self, 'model') and self.model is not None:
+            del self.model
+            self.model = None
+        
+        if hasattr(self, 'processor') and self.processor is not None:
+            del self.processor
+            self.processor = None
 
         super().unload_model()
 
