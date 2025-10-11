@@ -132,7 +132,7 @@ class SettingsDialog:
         device_combo = ttk.Combobox(
             frame,
             textvariable=self.asr_device_var,
-            values=["auto", "cpu", "cuda"],
+            values=["auto", "cpu", "cuda", "mps"],
             state="readonly"
         )
         device_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(10, 0), pady=5)
@@ -165,38 +165,86 @@ class SettingsDialog:
         frame.columnconfigure(1, weight=1)
     
     def create_translation_tab(self, notebook):
-        """Create translation settings tab."""
+        """Create unified translation settings tab."""
         frame = ttk.Frame(notebook, padding="10")
         notebook.add(frame, text="Translation")
         
+        # Translation method selection
+        method_frame = ttk.LabelFrame(frame, text="Translation Method", padding="10")
+        method_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 15))
+        
+        self.translation_method_var = tk.StringVar(value="huggingface")
+        
+        # HuggingFace Multi-Stage option
+        hf_radio = ttk.Radiobutton(
+            method_frame,
+            text="🔄 Multi-Stage Translation (Japanese → English → Chinese)",
+            variable=self.translation_method_var,
+            value="huggingface",
+            command=self.on_translation_method_change
+        )
+        hf_radio.grid(row=0, column=0, sticky=tk.W, pady=5)
+        
+        hf_desc = ttk.Label(
+            method_frame,
+            text="Uses separate models for ja→en and en→zh translation. Supports multiple language pairs.",
+            font=("TkDefaultFont", 9),
+            foreground="gray"
+        )
+        hf_desc.grid(row=1, column=0, sticky=tk.W, padx=(20, 0), pady=(0, 10))
+        
+        # SakuraLLM Direct option
+        sakura_radio = ttk.Radiobutton(
+            method_frame,
+            text="🌸 SakuraLLM Direct Translation (Japanese → Chinese)",
+            variable=self.translation_method_var,
+            value="sakura",
+            command=self.on_translation_method_change
+        )
+        sakura_radio.grid(row=2, column=0, sticky=tk.W, pady=5)
+        
+        sakura_desc = ttk.Label(
+            method_frame,
+            text="High-quality specialized model for Japanese→Chinese translation. Optimized for anime/manga content.",
+            font=("TkDefaultFont", 9),
+            foreground="gray"
+        )
+        sakura_desc.grid(row=3, column=0, sticky=tk.W, padx=(20, 0), pady=(0, 5))
+        
+        method_frame.columnconfigure(0, weight=1)
+        
+        # HuggingFace Settings Frame
+        self.hf_frame = ttk.LabelFrame(frame, text="🔄 Multi-Stage Translation Settings", padding="10")
+        self.hf_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 15))
+        
         # Japanese to English model
-        ttk.Label(frame, text="Japanese→English Model:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(self.hf_frame, text="Japanese→English Model:").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.ja_en_model_var = tk.StringVar()
-        ja_en_entry = ttk.Entry(frame, textvariable=self.ja_en_model_var, width=40)
+        ja_en_entry = ttk.Entry(self.hf_frame, textvariable=self.ja_en_model_var, width=50)
         ja_en_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(10, 0), pady=5)
         
         # English to Chinese model
-        ttk.Label(frame, text="English→Chinese Model:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Label(self.hf_frame, text="English→Chinese Model:").grid(row=1, column=0, sticky=tk.W, pady=5)
         self.en_zh_model_var = tk.StringVar()
-        en_zh_entry = ttk.Entry(frame, textvariable=self.en_zh_model_var, width=40)
+        en_zh_entry = ttk.Entry(self.hf_frame, textvariable=self.en_zh_model_var, width=50)
         en_zh_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(10, 0), pady=5)
         
-        # Translation device
-        ttk.Label(frame, text="Device:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        # HuggingFace device
+        ttk.Label(self.hf_frame, text="Device:").grid(row=2, column=0, sticky=tk.W, pady=5)
         self.trans_device_var = tk.StringVar()
         trans_device_combo = ttk.Combobox(
-            frame,
+            self.hf_frame,
             textvariable=self.trans_device_var,
-            values=["auto", "cpu", "cuda"],
+            values=["auto", "cpu", "cuda", "mps"],
             state="readonly"
         )
         trans_device_combo.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         
-        # Translation batch size
-        ttk.Label(frame, text="Batch Size:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        # HuggingFace batch size
+        ttk.Label(self.hf_frame, text="Batch Size:").grid(row=3, column=0, sticky=tk.W, pady=5)
         self.trans_batch_var = tk.IntVar()
         trans_batch_spin = tk.Spinbox(
-            frame,
+            self.hf_frame,
             from_=1,
             to=32,
             textvariable=self.trans_batch_var,
@@ -205,10 +253,10 @@ class SettingsDialog:
         trans_batch_spin.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         
         # Max length
-        ttk.Label(frame, text="Max Sequence Length:").grid(row=4, column=0, sticky=tk.W, pady=5)
+        ttk.Label(self.hf_frame, text="Max Sequence Length:").grid(row=4, column=0, sticky=tk.W, pady=5)
         self.trans_max_length_var = tk.IntVar()
         max_length_spin = tk.Spinbox(
-            frame,
+            self.hf_frame,
             from_=128,
             to=1024,
             increment=64,
@@ -217,7 +265,121 @@ class SettingsDialog:
         )
         max_length_spin.grid(row=4, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         
-        frame.columnconfigure(1, weight=1)
+        self.hf_frame.columnconfigure(1, weight=1)
+        
+        # SakuraLLM Settings Frame
+        self.sakura_frame = ttk.LabelFrame(frame, text="🌸 SakuraLLM Translation Settings", padding="10")
+        self.sakura_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 15))
+        
+        # Model selection
+        ttk.Label(self.sakura_frame, text="Model Size:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.sakura_model_var = tk.StringVar()
+        model_combo = ttk.Combobox(
+            self.sakura_frame,
+            textvariable=self.sakura_model_var,
+            values=[
+                "sakura-1.5b-v1.0 (3GB VRAM) - Latest, compact",
+                "sakura-14b-v1.0 (16GB VRAM) - Latest, high quality"
+            ],
+            state="readonly",
+            width=60
+        )
+        model_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(10, 0), pady=5)
+        
+        # SakuraLLM device selection
+        ttk.Label(self.sakura_frame, text="Device:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.sakura_device_var = tk.StringVar()
+        sakura_device_combo = ttk.Combobox(
+            self.sakura_frame,
+            textvariable=self.sakura_device_var,
+            values=["auto", "cuda", "mps", "cpu"],
+            state="readonly"
+        )
+        sakura_device_combo.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        
+        # Temperature
+        ttk.Label(self.sakura_frame, text="Temperature (0.0-1.0):").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.sakura_temp_var = tk.DoubleVar()
+        temp_scale = ttk.Scale(
+            self.sakura_frame,
+            from_=0.0,
+            to=1.0,
+            variable=self.sakura_temp_var,
+            orient=tk.HORIZONTAL,
+            length=200
+        )
+        temp_scale.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=(10, 0), pady=5)
+        
+        # Temperature value label
+        self.temp_value_label = ttk.Label(self.sakura_frame, text="0.1")
+        self.temp_value_label.grid(row=2, column=2, padx=(10, 0), pady=5)
+        
+        # Update temperature display
+        def update_temp_display(*args):
+            self.temp_value_label.config(text=f"{self.sakura_temp_var.get():.1f}")
+        self.sakura_temp_var.trace('w', update_temp_display)
+        
+        # Max new tokens
+        ttk.Label(self.sakura_frame, text="Max New Tokens:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.sakura_max_tokens_var = tk.IntVar()
+        tokens_spin = tk.Spinbox(
+            self.sakura_frame,
+            from_=128,
+            to=2048,
+            increment=128,
+            textvariable=self.sakura_max_tokens_var,
+            width=10
+        )
+        tokens_spin.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        
+        # Advanced options frame
+        adv_frame = ttk.Frame(self.sakura_frame)
+        adv_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        
+        # Force GPU
+        self.sakura_force_gpu_var = tk.BooleanVar()
+        gpu_check = ttk.Checkbutton(
+            adv_frame,
+            text="Force GPU acceleration (recommended)",
+            variable=self.sakura_force_gpu_var
+        )
+        gpu_check.grid(row=0, column=0, sticky=tk.W, pady=2)
+        
+        # Use chat template
+        self.sakura_chat_template_var = tk.BooleanVar()
+        template_check = ttk.Checkbutton(
+            adv_frame,
+            text="Use chat template (better translation quality)",
+            variable=self.sakura_chat_template_var
+        )
+        template_check.grid(row=1, column=0, sticky=tk.W, pady=2)
+        
+        self.sakura_frame.columnconfigure(1, weight=1)
+        
+        frame.columnconfigure(0, weight=1)
+    
+    def on_translation_method_change(self):
+        """Handle translation method change."""
+        method = self.translation_method_var.get()
+        
+        if method == "huggingface":
+            # Enable HuggingFace frame, disable SakuraLLM frame
+            self._set_frame_state(self.hf_frame, tk.NORMAL)
+            self._set_frame_state(self.sakura_frame, tk.DISABLED)
+        else:  # sakura
+            # Enable SakuraLLM frame, disable HuggingFace frame
+            self._set_frame_state(self.hf_frame, tk.DISABLED)
+            self._set_frame_state(self.sakura_frame, tk.NORMAL)
+    
+    def _set_frame_state(self, frame, state):
+        """Recursively set the state of all widgets in a frame."""
+        for child in frame.winfo_children():
+            try:
+                child.configure(state=state)
+            except tk.TclError:
+                # Some widgets don't support state configuration
+                if hasattr(child, 'winfo_children'):
+                    self._set_frame_state(child, state)
     
     def create_output_tab(self, notebook):
         """Create output settings tab."""
@@ -318,6 +480,31 @@ class SettingsDialog:
             self.trans_batch_var.set(trans_config.get("batch_size", 8))
             self.trans_max_length_var.set(trans_config.get("max_length", 512))
             
+            # Translation method and SakuraLLM settings
+            sakura_config = self.config.get_sakura_config()
+            is_sakura_enabled = sakura_config.get("enabled", False)
+            
+            # Set translation method based on SakuraLLM enabled status
+            self.translation_method_var.set("sakura" if is_sakura_enabled else "huggingface")
+            
+            # Map model name to display text
+            current_model = sakura_config.get("model_name", "")
+            model_mapping = {
+                "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF": "sakura-1.5b-v1.0 (3GB VRAM) - Latest, compact",
+                "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF": "sakura-14b-v1.0 (16GB VRAM) - Latest, high quality"
+            }
+            display_model = model_mapping.get(current_model, "sakura-1.5b-v1.0 (3GB VRAM) - Latest, compact")
+            self.sakura_model_var.set(display_model)
+            
+            self.sakura_device_var.set(sakura_config.get("device", "auto"))
+            self.sakura_temp_var.set(sakura_config.get("temperature", 0.1))
+            self.sakura_max_tokens_var.set(sakura_config.get("max_new_tokens", 512))
+            self.sakura_force_gpu_var.set(sakura_config.get("force_gpu", True))
+            self.sakura_chat_template_var.set(sakura_config.get("use_chat_template", True))
+            
+            # Update frame states based on selected method
+            self.on_translation_method_change()
+            
             # Output settings
             output_config = self.config.get_output_config()
             self.output_format_var.set(output_config.get("default_format", "srt"))
@@ -353,6 +540,28 @@ class SettingsDialog:
             self.config.set("translation.device", self.trans_device_var.get())
             self.config.set("translation.batch_size", self.trans_batch_var.get())
             self.config.set("translation.max_length", self.trans_max_length_var.get())
+            
+            # Translation method and SakuraLLM settings
+            is_sakura_method = (self.translation_method_var.get() == "sakura")
+            self.config.set("sakura.enabled", is_sakura_method)
+            
+            # Map display text back to model name
+            display_to_model = {
+                "sakura-1.5b-v1.0 (3GB VRAM) - Latest, compact": "sakura-1.5b-v1.0",
+                "sakura-14b-v1.0 (16GB VRAM) - Latest, high quality": "sakura-14b-v1.0"
+            }
+            selected_display = self.sakura_model_var.get()
+            model_key = display_to_model.get(selected_display, "sakura-1.5b-v1.0")
+            
+            # Set the model using the config's helper method
+            if is_sakura_method:
+                self.config.set_sakura_model(model_key)
+            
+            self.config.set("sakura.device", self.sakura_device_var.get())
+            self.config.set("sakura.temperature", self.sakura_temp_var.get())
+            self.config.set("sakura.max_new_tokens", self.sakura_max_tokens_var.get())
+            self.config.set("sakura.force_gpu", self.sakura_force_gpu_var.get())
+            self.config.set("sakura.use_chat_template", self.sakura_chat_template_var.get())
             
             # Output settings
             self.config.set("output.default_format", self.output_format_var.get())

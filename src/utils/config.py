@@ -1,4 +1,12 @@
-"""Configuration management for the application."""
+"""Configuration        "asr": {
+            "model_name": "openai/whisper-large-v3",  # Default Whisper model
+            "device": "auto",  # auto, cpu, cuda, mps (Apple Silicon)
+            "batch_size": 1,
+            "language": "ja",  # Japanese
+            "return_timestamps": True,
+            "chunk_length": 30,  # seconds
+            "overlap": 1.0  # seconds
+        },nt for the application."""
 
 import os
 from pathlib import Path
@@ -29,6 +37,39 @@ class Config:
             "device": "auto",  # auto, cpu, cuda, mps (Apple Silicon)
             "batch_size": 8,
             "max_length": 512
+        },
+        "sakura": {
+            # SakuraLLM configuration for high-quality Japanese translation
+            "enabled": False,  # Enable SakuraLLM for advanced translation
+            "model_name": "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",  # Default Sakura model
+            "model_file": "sakura-1.5b-qwen2.5-v1.0-q4_k_m.gguf",  # Specific GGUF file
+            "device": "auto",  # auto, cpu, cuda, mps
+            "context_length": 8192,  # Context window size
+            "max_new_tokens": 512,  # Maximum tokens to generate
+            "temperature": 0.1,  # Low temperature for consistent translation
+            "top_p": 0.95,  # Nucleus sampling
+            "repetition_penalty": 1.1,  # Prevent repetition
+            "batch_size": 1,  # Start with 1 for large models
+            "torch_dtype": "float16",  # Use float16 for memory efficiency
+            "force_gpu": True,  # Require GPU for large models
+            "use_chat_template": True,  # Use chat template for better results
+            # Available SakuraLLM models (latest versions only)
+            "available_models": {
+                "sakura-1.5b-v1.0": {
+                    "model_name": "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
+                    "model_file": "sakura-1.5b-qwen2.5-v1.0-q4_k_m.gguf",
+                    "description": "Latest compact 1.5B parameter model (3GB VRAM)",
+                    "vram_required": "3GB",
+                    "release_date": "20241012"
+                },
+                "sakura-14b-v1.0": {
+                    "model_name": "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF",
+                    "model_file": "sakura-14b-qwen2.5-v1.0-q4_k_m.gguf", 
+                    "description": "Latest large 14B parameter model (16GB VRAM)",
+                    "vram_required": "16GB",
+                    "release_date": "20241008"
+                }
+            }
         },
         "ui": {
             "window_title": "Sakura Subtitle Generator",
@@ -168,6 +209,64 @@ class Config:
     def get_output_config(self) -> Dict[str, Any]:
         """Get output-specific configuration."""
         return self.config.get("output", {})
+    
+    def get_sakura_config(self) -> Dict[str, Any]:
+        """Get SakuraLLM-specific configuration."""
+        return self.config.get("sakura", {})
+    
+    def is_sakura_enabled(self) -> bool:
+        """Check if SakuraLLM is enabled."""
+        return self.get("sakura.enabled", False)
+    
+    def get_sakura_model_info(self, model_key: Optional[str] = None) -> Dict[str, Any]:
+        """Get SakuraLLM model information.
+        
+        Args:
+            model_key: Specific model key (e.g., 'sakura-1b8-v1.0')
+                      If None, returns current configured model info
+        
+        Returns:
+            Model information dictionary
+        """
+        if model_key:
+            available_models = self.get("sakura.available_models", {})
+            return available_models.get(model_key, {})
+        
+        # Return current model configuration
+        return {
+            "model_name": self.get("sakura.model_name"),
+            "model_file": self.get("sakura.model_file"),
+            "description": "Current configured model",
+            "vram_required": "Unknown"
+        }
+    
+    def set_sakura_model(self, model_key: str) -> bool:
+        """Set SakuraLLM model by key.
+        
+        Args:
+            model_key: Model key from available_models
+            
+        Returns:
+            True if successful, False if model not found
+        """
+        model_info = self.get_sakura_model_info(model_key)
+        if not model_info:
+            logger.error(f"SakuraLLM model '{model_key}' not found in available models")
+            return False
+        
+        # Update configuration
+        success = True
+        success &= self.set("sakura.model_name", model_info.get("model_name"))
+        success &= self.set("sakura.model_file", model_info.get("model_file"))
+        
+        if success:
+            logger.info(f"SakuraLLM model set to: {model_key} ({model_info.get('description')})")
+        
+        return success
+    
+    def get_available_sakura_models(self) -> Dict[str, Dict[str, Any]]:
+        """Get all available SakuraLLM models."""
+        return self.get("sakura.available_models", {})
     
     def setup_directories(self):
         """Create necessary directories based on config."""

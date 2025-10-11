@@ -24,6 +24,37 @@
     "batch_size": 8,
     "max_length": 512
   },
+  "sakura": {
+    "enabled": false,
+    "model_name": "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
+    "model_file": "sakura-1.5b-qwen2.5-v1.0-q4_k_m.gguf",
+    "device": "auto",
+    "context_length": 8192,
+    "max_new_tokens": 512,
+    "temperature": 0.1,
+    "top_p": 0.95,
+    "repetition_penalty": 1.1,
+    "batch_size": 1,
+    "torch_dtype": "float16",
+    "force_gpu": true,
+    "use_chat_template": true,
+    "available_models": {
+      "sakura-1.5b-v1.0": {
+        "model_name": "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
+        "model_file": "sakura-1.5b-qwen2.5-v1.0-q4_k_m.gguf",
+        "description": "Latest compact 1.5B parameter model (3GB VRAM)",
+        "vram_required": "3GB",
+        "release_date": "20241012"
+      },
+      "sakura-14b-v1.0": {
+        "model_name": "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF",
+        "model_file": "sakura-14b-qwen2.5-v1.0-q4_k_m.gguf",
+        "description": "Latest large 14B parameter model (16GB VRAM)",
+        "vram_required": "16GB",
+        "release_date": "20241008"
+      }
+    }
+  },
   "ui": {
     "window_title": "Sakura Subtitle Generator",
     "window_size": "800x600",
