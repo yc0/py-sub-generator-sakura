@@ -518,6 +518,53 @@ class SettingsDialog:
         temp_dir_entry = ttk.Entry(frame, textvariable=self.temp_dir_var, width=40)
         temp_dir_entry.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=(10, 0), pady=5)
 
+        # Dual language output section
+        separator = ttk.Separator(frame, orient="horizontal")
+        separator.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
+
+        # Generate both languages option
+        self.generate_both_var = tk.BooleanVar()
+        dual_lang_check = ttk.Checkbutton(
+            frame,
+            text="Generate both original (Japanese) and translated subtitle files",
+            variable=self.generate_both_var,
+            command=self._on_dual_language_toggle,
+        )
+        dual_lang_check.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=5)
+
+        # Info label for dual language feature
+        info_label = ttk.Label(
+            frame,
+            text="💡 When enabled, creates separate files for Japanese and translated subtitles\n"
+                 "   Example: video_ja.srt (Japanese) and video_zh.srt (Chinese)",
+            foreground="blue",
+            font=("TkDefaultFont", 8),
+        )
+        info_label.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+
+        # Language suffix customization (initially hidden)
+        self.suffix_frame = ttk.LabelFrame(frame, text="File Naming Options", padding="5")
+        
+        # Original language suffix
+        ttk.Label(self.suffix_frame, text="Japanese file suffix:").grid(
+            row=0, column=0, sticky=tk.W, pady=2
+        )
+        self.original_suffix_var = tk.StringVar()
+        original_suffix_entry = ttk.Entry(
+            self.suffix_frame, textvariable=self.original_suffix_var, width=10
+        )
+        original_suffix_entry.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=2)
+        
+        # Translated language suffix
+        ttk.Label(self.suffix_frame, text="Chinese file suffix:").grid(
+            row=1, column=0, sticky=tk.W, pady=2
+        )
+        self.translated_suffix_var = tk.StringVar()
+        translated_suffix_entry = ttk.Entry(
+            self.suffix_frame, textvariable=self.translated_suffix_var, width=10
+        )
+        translated_suffix_entry.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=2)
+
         frame.columnconfigure(1, weight=1)
 
     def create_ui_tab(self, notebook):
@@ -563,6 +610,15 @@ class SettingsDialog:
         interval_spin.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=5)
 
         frame.columnconfigure(1, weight=1)
+
+    def _on_dual_language_toggle(self):
+        """Handle dual language checkbox toggle."""
+        if self.generate_both_var.get():
+            # Show suffix configuration options
+            self.suffix_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
+        else:
+            # Hide suffix configuration options
+            self.suffix_frame.grid_remove()
 
     def load_settings(self):
         """Load current settings into form."""
@@ -627,6 +683,14 @@ class SettingsDialog:
             )
             self.output_dir_var.set(output_config.get("output_directory", "outputs"))
             self.temp_dir_var.set(output_config.get("temp_directory", "temp"))
+            
+            # Dual language settings
+            self.generate_both_var.set(output_config.get("generate_both_languages", True))
+            self.original_suffix_var.set(output_config.get("original_language_suffix", "_ja"))
+            self.translated_suffix_var.set(output_config.get("translated_language_suffix", "_zh"))
+            
+            # Trigger toggle to show/hide suffix options
+            self._on_dual_language_toggle()
 
             # UI settings
             ui_config = self.config.get_ui_config()
@@ -690,6 +754,11 @@ class SettingsDialog:
             )
             self.config.set("output.output_directory", self.output_dir_var.get())
             self.config.set("output.temp_directory", self.temp_dir_var.get())
+            
+            # Dual language settings
+            self.config.set("output.generate_both_languages", self.generate_both_var.get())
+            self.config.set("output.original_language_suffix", self.original_suffix_var.get())
+            self.config.set("output.translated_language_suffix", self.translated_suffix_var.get())
 
             # UI settings
             self.config.set("ui.window_size", self.window_size_var.get())

@@ -254,6 +254,9 @@ class TranslationPipeline(LoggerMixin):
             formats = ["srt"]
 
         output_files = {}
+        generate_both = self.config.get_generate_both_languages()
+        original_suffix = self.config.get_original_language_suffix()
+        translated_suffix = self.config.get_translated_language_suffix()
 
         try:
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -265,17 +268,18 @@ class TranslationPipeline(LoggerMixin):
                 else "subtitles"
             )
 
-            # Export original (Japanese)
-            for fmt in formats:
-                if fmt == "srt":
-                    original_content = subtitle_file.export_srt()
-                    original_file = output_dir / f"{base_name}_ja.srt"
+            # Export original (Japanese) if user wants both languages
+            if generate_both:
+                for fmt in formats:
+                    if fmt == "srt":
+                        original_content = subtitle_file.export_srt()
+                        original_file = output_dir / f"{base_name}{original_suffix}.srt"
 
-                    with open(original_file, "w", encoding="utf-8") as f:
-                        f.write(original_content)
+                        with open(original_file, "w", encoding="utf-8") as f:
+                            f.write(original_content)
 
-                    output_files["ja_srt"] = original_file
-                    self.logger.info(f"Exported Japanese subtitles: {original_file}")
+                        output_files[f"original_{fmt}"] = original_file
+                        self.logger.info(f"Exported Japanese subtitles: {original_file}")
 
             # Export translations
             for lang_code, translations in subtitle_file.translations.items():
@@ -283,9 +287,14 @@ class TranslationPipeline(LoggerMixin):
                     for fmt in formats:
                         if fmt == "srt":
                             translated_content = subtitle_file.export_srt(lang_code)
-                            translated_file = (
-                                output_dir / f"{base_name}_{lang_code}.srt"
-                            )
+                            
+                            # Use custom suffix if generating both, otherwise use language code
+                            if generate_both and lang_code in ["zh", "zh-cn", "zh-tw"]:
+                                suffix = translated_suffix
+                            else:
+                                suffix = f"_{lang_code}"
+                            
+                            translated_file = output_dir / f"{base_name}{suffix}.srt"
 
                             with open(translated_file, "w", encoding="utf-8") as f:
                                 f.write(translated_content)

@@ -15,7 +15,7 @@
     "max_length": 512
   },
   "sakura": {
-    "enabled": false,
+    "enabled": true,
     "model_name": "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF",
     "model_file": "sakura-14b-qwen2.5-v1.0-q4_k_m.gguf",
     "device": "auto",
@@ -55,7 +55,10 @@
     "default_format": "srt",
     "include_confidence": true,
     "output_directory": "outputs",
-    "temp_directory": "temp"
+    "temp_directory": "temp",
+    "generate_both_languages": true,
+    "original_language_suffix": "_ja",
+    "translated_language_suffix": "_zh"
   },
   "logging": {
     "level": "INFO",

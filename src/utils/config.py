@@ -80,6 +80,9 @@ class Config:
             "include_confidence": True,
             "output_directory": "outputs",
             "temp_directory": "temp",
+            "generate_both_languages": True,
+            "original_language_suffix": "_ja",
+            "translated_language_suffix": "_zh",
         },
         "logging": {
             "level": "INFO",
@@ -311,3 +314,19 @@ class Config:
                 result[key] = value
 
         return result
+
+    def get_generate_both_languages(self) -> bool:
+        """Check if both original and translated subtitles should be generated."""
+        return self.get("output.generate_both_languages", True)
+
+    def set_generate_both_languages(self, enabled: bool) -> None:
+        """Set whether to generate both language subtitle files."""
+        self.set("output.generate_both_languages", enabled)
+
+    def get_original_language_suffix(self) -> str:
+        """Get suffix for original language subtitle files."""
+        return self.get("output.original_language_suffix", "_ja")
+
+    def get_translated_language_suffix(self) -> str:
+        """Get suffix for translated language subtitle files."""
+        return self.get("output.translated_language_suffix", "_zh")
