@@ -18,7 +18,9 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  install       Install dependencies with uv"
-	@echo "  install-dev   Install with dev dependencies"
+	@echo "  install-dev   Install with dev dependencies + tools"
+	@echo "  install-tools Install dev tools (ruff, black, etc) via uv tool"  
+	@echo "  check-tools   Check installed development tools"
 	@echo "  format        Format code with black and isort"
 	@echo "  lint          Run linting with ruff and mypy"
 	@echo "  clean         Clean cache and temporary files"
@@ -62,6 +64,8 @@ install:
 install-dev:
 	@echo "📦 Installing with dev dependencies..."
 	uv sync --extra dev
+	@echo "🔧 Installing development tools with uv tool..."
+	@$(MAKE) install-tools
 
 install-gpu:
 	@echo "📦 Installing with GPU dependencies..."
@@ -75,22 +79,50 @@ install-all:
 	@echo "📦 Installing all dependencies..."
 	uv sync --all-extras
 
+# Development tools (managed separately via uv tool)
+install-tools:
+	@echo "🔧 Installing development tools with uv tool..."
+	@echo "  📏 Installing ruff (linter & formatter)..."
+	@uv tool install ruff
+	@echo "  🎨 Installing black (code formatter)..."  
+	@uv tool install black
+	@echo "  📋 Installing isort (import sorter)..."
+	@uv tool install isort
+	@echo "  🔍 Installing mypy (type checker)..."
+	@uv tool install mypy
+	@echo "✅ Development tools installed globally with uv tool!"
+
+update-tools:
+	@echo "⬆️  Updating development tools..."
+	@uv tool upgrade ruff || echo "ruff not installed, skipping"
+	@uv tool upgrade black || echo "black not installed, skipping"  
+	@uv tool upgrade isort || echo "isort not installed, skipping"
+	@uv tool upgrade mypy || echo "mypy not installed, skipping"
+	@echo "✅ Development tools updated!"
+
+check-tools:
+	@echo "🔍 Checking development tools..."
+	@echo -n "  ruff: " && (uv tool run ruff --version 2>/dev/null || echo "❌ Not installed")
+	@echo -n "  black: " && (uv tool run black --version 2>/dev/null || echo "❌ Not installed")
+	@echo -n "  isort: " && (uv tool run isort --version 2>/dev/null || echo "❌ Not installed") 
+	@echo -n "  mypy: " && (uv tool run mypy --version 2>/dev/null || echo "❌ Not installed")
+
 # Development commands
 format:
 	@echo "🎨 Formatting code..."
-	uv run black src/ tests/ --line-length 100
-	uv run isort src/ tests/ --profile black
+	@uv tool run black src/ tests/ --line-length 88
+	@uv tool run isort src/ tests/ --profile black
 
 lint:
 	@echo "🔍 Running linters..."
-	uv run ruff check src/ tests/
-	uv run mypy src/ --ignore-missing-imports
+	@uv tool run ruff check src/ tests/
+	@uv tool run mypy src/ --ignore-missing-imports
 
 lint-fix:
 	@echo "🔧 Auto-fixing lint issues..."
-	uv run ruff check src/ tests/ --fix
-	uv run black src/ tests/ --line-length 100
-	uv run isort src/ tests/ --profile black
+	@uv tool run ruff check src/ tests/ --fix
+	@uv tool run black src/ tests/ --line-length 88
+	@uv tool run isort src/ tests/ --profile black
 
 # Cleanup commands
 clean:

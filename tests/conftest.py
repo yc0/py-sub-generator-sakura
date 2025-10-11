@@ -4,12 +4,12 @@
 Common fixtures and configuration for all tests.
 """
 
-import pytest
 import sys
-import os
 from pathlib import Path
-import torch
 from unittest.mock import Mock
+
+import pytest
+import torch
 
 # Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -40,7 +40,7 @@ def sample_japanese_texts():
     ]
 
 
-@pytest.fixture(scope="session")  
+@pytest.fixture(scope="session")
 def sample_english_texts():
     """Sample English texts for testing."""
     return [
@@ -57,11 +57,11 @@ def sample_english_texts():
 def gpu_available():
     """Check if GPU acceleration is available."""
     cuda_available = torch.cuda.is_available()
-    mps_available = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+    mps_available = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
     return {
         "cuda": cuda_available,
         "mps": mps_available,
-        "any": cuda_available or mps_available
+        "any": cuda_available or mps_available,
     }
 
 
@@ -90,7 +90,7 @@ def sample_translation_config():
         "en_to_zh_model": "Helsinki-NLP/opus-mt-en-zh",
         "device": "auto",
         "batch_size": 4,
-        "max_length": 512
+        "max_length": 512,
     }
 
 
@@ -102,7 +102,7 @@ def sample_asr_config():
         "device": "auto",
         "batch_size": 1,
         "language": "ja",
-        "return_timestamps": True
+        "return_timestamps": True,
     }
 
 
@@ -129,8 +129,10 @@ def skip_if_no_cuda(gpu_available):
 
 class MockTranslationResult:
     """Mock translation result for testing."""
-    
-    def __init__(self, original_text: str, translated_text: str, confidence: float = 0.9):
+
+    def __init__(
+        self, original_text: str, translated_text: str, confidence: float = 0.9
+    ):
         self.original_text = original_text
         self.translated_text = translated_text
         self.confidence = confidence
@@ -152,7 +154,7 @@ def pytest_configure(config):
     """Configure pytest with custom markers and settings."""
     # Add custom markers
     config.addinivalue_line("markers", "slow: marks tests as slow")
-    config.addinivalue_line("markers", "gpu: requires GPU acceleration")  
+    config.addinivalue_line("markers", "gpu: requires GPU acceleration")
     config.addinivalue_line("markers", "integration: integration test")
     config.addinivalue_line("markers", "unit: unit test")
 
@@ -161,13 +163,20 @@ def pytest_collection_modifyitems(config, items):
     """Modify test collection to add markers automatically."""
     for item in items:
         # Add unit marker to all tests by default
-        if not any(marker.name in ["integration", "slow", "gpu"] for marker in item.iter_markers()):
+        if not any(
+            marker.name in ["integration", "slow", "gpu"]
+            for marker in item.iter_markers()
+        ):
             item.add_marker(pytest.mark.unit)
-        
+
         # Add gpu marker to GPU-related tests
-        if "gpu" in item.name.lower() or "mps" in item.name.lower() or "cuda" in item.name.lower():
+        if (
+            "gpu" in item.name.lower()
+            or "mps" in item.name.lower()
+            or "cuda" in item.name.lower()
+        ):
             item.add_marker(pytest.mark.gpu)
-        
+
         # Add slow marker to model loading tests
         if "model" in item.name.lower() and "load" in item.name.lower():
             item.add_marker(pytest.mark.slow)
@@ -177,6 +186,8 @@ def pytest_runtest_setup(item):
     """Setup for individual test runs."""
     # Skip GPU tests if no GPU available
     if "gpu" in [marker.name for marker in item.iter_markers()]:
-        if not (torch.cuda.is_available() or 
-                (hasattr(torch.backends, 'mps') and torch.backends.mps.is_available())):
+        if not (
+            torch.cuda.is_available()
+            or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+        ):
             pytest.skip("GPU acceleration not available")
