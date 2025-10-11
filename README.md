@@ -57,15 +57,25 @@ If you **only have CPU** and need CPU-optimized inference, this project focuses 
 ### Hardware Requirements
 
 #### **🎯 Recommended (GPU Acceleration):**
-- **Apple Silicon**: M1/M2/M3/M4 with 16GB+ unified memory
-- **NVIDIA GPU**: RTX/GTX with 8GB+ VRAM 
+- **Apple Silicon**: M2/M3/M4 with 16GB+ unified memory
+- **NVIDIA GPU**: RTX 3070/4070+ with 8GB+ VRAM 
 - **System RAM**: 16GB+ for model loading
-- **Storage**: 10GB+ free space for models
+- **Storage**: 10GB+ free space (3.6GB models + cache)
+- **Expected Performance**: 8-12x realtime processing
+
+#### **💰 Minimum (Budget Setup):**
+- **Apple Silicon**: M1 with 8GB unified memory
+- **NVIDIA GPU**: GTX 1660 with 6GB VRAM
+- **Alternative**: Use `whisper-medium` (1.5GB vs 3GB)
+- **Expected Performance**: 4-6x realtime processing
 
 #### **⚠️ CPU-Only (Not Optimized):**
-- **Performance**: 4-12x slower than GPU
-- **Memory**: 32GB+ RAM recommended
-- **Note**: Consider implementing ctransformers for CPU optimization (outside project scope)
+- **Performance**: 4-12x slower than GPU (1-2x realtime)
+- **Memory**: 32GB+ RAM recommended for all models
+- **Models**: Consider `whisper-small` for better CPU performance
+- **Note**: Implement ctransformers for CPU optimization (outside project scope)
+
+> 📝 **See [Default Models & Requirements](#-default-models--requirements) section for detailed specifications**
 
 ### Software Prerequisites
 
@@ -303,15 +313,199 @@ Configuration can be modified through:
 - Direct JSON file editing (`config.json`)
 - Command line arguments
 
-## 🔧 Models Used
+## 🤖 Default Models & Requirements
 
-### ASR Models
-- **Primary**: `openai/whisper-large-v3` (Highest accuracy)
-- **Alternatives**: `whisper-medium`, `whisper-small` (Faster, lower memory)
+### 🎙️ **ASR Models (Speech Recognition)**
 
-### Translation Models  
-- **Japanese → English**: `Helsinki-NLP/opus-mt-ja-en`
-- **English → Chinese**: `Helsinki-NLP/opus-mt-en-zh`
+#### **Default: OpenAI Whisper Large-v3**
+- **Model**: [`openai/whisper-large-v3`](https://huggingface.co/openai/whisper-large-v3)
+- **Size**: ~3GB download
+- **Languages**: 99+ languages (optimized for Japanese)
+- **Quality**: Highest accuracy for Japanese speech recognition
+
+**Hardware Requirements:**
+| Hardware | **Minimum** | **Recommended** |
+|----------|-------------|----------------|
+| **Apple Silicon** | M1 8GB | M2/M3 16GB+ |
+| **NVIDIA GPU** | GTX 1660 6GB | RTX 3070 8GB+ |
+| **CPU Only** | 16GB RAM | 32GB RAM |
+| **Processing** | 2x realtime | 8-12x realtime |
+
+#### **Alternative ASR Models:**
+
+| Model | Size | Speed | Accuracy | Min Requirements |
+|-------|------|-------|----------|-----------------|
+| **whisper-large-v3** | 3GB | Slow | Highest | 8GB VRAM/RAM |
+| **whisper-medium** | 1.5GB | Medium | High | 4GB VRAM/RAM |
+| **whisper-small** | 500MB | Fast | Good | 2GB VRAM/RAM |
+| **whisper-base** | 150MB | Fastest | Fair | 1GB VRAM/RAM |
+
+### 🌐 **Translation Models**
+
+#### **Japanese → English**
+- **Model**: [`Helsinki-NLP/opus-mt-ja-en`](https://huggingface.co/Helsinki-NLP/opus-mt-ja-en)
+- **Size**: ~300MB download
+- **Specialty**: Japanese to English translation
+- **Performance**: Optimized for subtitle-length text
+
+#### **English → Chinese (Traditional)**
+- **Model**: [`Helsinki-NLP/opus-mt-en-zh`](https://huggingface.co/Helsinki-NLP/opus-mt-en-zh)
+- **Size**: ~300MB download  
+- **Specialty**: English to Chinese translation
+- **Output**: Traditional Chinese characters
+
+**Translation Hardware Requirements:**
+| Hardware | **Both Models Combined** |
+|----------|-------------------------|
+| **GPU Memory** | 1GB VRAM (both models) |
+| **System RAM** | 2GB RAM (both models) |
+| **Processing** | 4x faster on GPU vs CPU |
+
+### 📊 **Total System Requirements**
+
+#### **Complete Setup (All Models):**
+| Component | **Download Size** | **Runtime Memory** |
+|-----------|------------------|-------------------|
+| **Whisper Large-v3** | 3.0GB | 6GB VRAM/RAM |
+| **Translation Models** | 0.6GB | 1GB VRAM/RAM |
+| **Total** | **3.6GB** | **7GB VRAM/RAM** |
+
+#### **Recommended Configurations:**
+
+**🍎 Apple Silicon (Optimal):**
+- **M2/M3/M4**: 16GB unified memory
+- **Storage**: 10GB free space
+- **Expected Performance**: 8x realtime processing
+
+**🚀 NVIDIA GPU (Optimal):**
+- **GPU**: RTX 3070/4070 (8GB+ VRAM)
+- **RAM**: 16GB system memory
+- **Expected Performance**: 12x realtime processing
+
+**💻 Budget/Lower-end Hardware:**
+```python
+# Use smaller models in config.json
+{
+  "asr": {
+    "model_name": "openai/whisper-medium"  # 1.5GB vs 3GB
+  }
+}
+```
+
+### 🔗 **Model Links & Licenses**
+
+| Model | Hugging Face Link | License | Purpose |
+|-------|------------------|---------|---------|
+| **Whisper Large-v3** | [🤗 Link](https://huggingface.co/openai/whisper-large-v3) | MIT | Japanese ASR |
+| **OPUS JA-EN** | [🤗 Link](https://huggingface.co/Helsinki-NLP/opus-mt-ja-en) | Apache 2.0 | Japanese→English |
+| **OPUS EN-ZH** | [🤗 Link](https://huggingface.co/Helsinki-NLP/opus-mt-en-zh) | Apache 2.0 | English→Chinese |
+
+### ⚠️ **Model Constraints & Limitations**
+
+#### **Whisper Large-v3:**
+- **Languages**: Optimized for Japanese, may struggle with heavy dialect
+- **Audio Quality**: Works best with clear speech, struggles with background noise
+- **Length**: Optimal for 30-second chunks (longer may degrade accuracy)
+- **Real-time**: Not suitable for live transcription (processing delay)
+
+#### **Translation Models:**
+- **Domain**: Trained on general text, may struggle with technical/domain-specific terms
+- **Length**: Optimized for sentence-level translation (subtitle appropriate)
+- **Formality**: May not preserve Japanese politeness levels in translation
+- **Cultural Context**: Limited cultural nuance preservation
+
+#### **Hardware Constraints:**
+- **Memory**: All models must fit in VRAM/RAM simultaneously
+- **Processing**: CPU fallback is 4-12x slower than GPU
+- **Storage**: SSD recommended for faster model loading (vs HDD)
+
+### 🎯 **Hardware-Specific Setup Recommendations**
+
+#### **🏆 High-End Setup (Recommended)**
+```json
+// config.json for optimal performance
+{
+  "asr": {
+    "model_name": "openai/whisper-large-v3",
+    "batch_size": 1,
+    "device": "auto"
+  },
+  "translation": {
+    "batch_size": 8,
+    "device": "auto"
+  }
+}
+```
+**Hardware**: M3/M4 16GB+ or RTX 3070+ 8GB  
+**Performance**: 8-12x realtime  
+**Use Case**: Production subtitle generation
+
+#### **💰 Budget Setup (Balanced)**
+```json
+// config.json for balanced performance/memory
+{
+  "asr": {
+    "model_name": "openai/whisper-medium",
+    "batch_size": 1,
+    "device": "auto"
+  },
+  "translation": {
+    "batch_size": 4,
+    "device": "auto"  
+  }
+}
+```
+**Hardware**: M1/M2 8GB or GTX 1660 6GB  
+**Performance**: 4-6x realtime  
+**Use Case**: Personal use, occasional processing
+
+#### **🔋 Minimal Setup (Emergency)**
+```json
+// config.json for low-resource systems
+{
+  "asr": {
+    "model_name": "openai/whisper-small",
+    "batch_size": 1,
+    "device": "cpu"
+  },
+  "translation": {
+    "batch_size": 1,
+    "device": "cpu"
+  }
+}
+```
+**Hardware**: Any system with 8GB RAM  
+**Performance**: 1-2x realtime  
+**Use Case**: Testing, very low-end hardware
+
+### 📥 **First-Time Setup & Downloads**
+
+#### **Automatic Model Downloads:**
+```bash
+# First run will download all models (~3.6GB)
+uv run python main.py
+
+# Downloads will occur to:
+# ~/.cache/huggingface/transformers/
+# Total download time: 5-15 minutes (depending on internet)
+```
+
+#### **Pre-download Models (Optional):**
+```python
+# Pre-download script (optional)
+uv run python -c "
+from transformers import AutoModel, AutoTokenizer, pipeline
+
+# Download ASR model
+pipeline('automatic-speech-recognition', model='openai/whisper-large-v3')
+
+# Download translation models  
+pipeline('translation', model='Helsinki-NLP/opus-mt-ja-en')
+pipeline('translation', model='Helsinki-NLP/opus-mt-en-zh')
+
+print('All models downloaded successfully!')
+"
+```
 
 ## ⚡ Performance Comparison
 
