@@ -74,6 +74,7 @@ class SakuraTranslator(BaseTranslator):
         """
         try:
             from llama_cpp import Llama
+            import os
 
             # Find model file path
             model_path = self._find_model_file()
@@ -82,6 +83,10 @@ class SakuraTranslator(BaseTranslator):
                 return False
 
             logger.info(f"🌸 Loading SakuraLLM from: {model_path}")
+
+            # Suppress expected Metal kernel warnings for unsupported operations
+            # These warnings are normal on older Apple Silicon models
+            os.environ.setdefault("GGML_METAL_LOG_LEVEL", "WARN")
 
             # Initialize Llama with optimal settings
             self.llm = Llama(

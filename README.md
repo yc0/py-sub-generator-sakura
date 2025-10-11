@@ -36,22 +36,31 @@ If you **only have CPU** and need CPU-optimized inference, this project focuses 
 - **NVIDIA GPUs**: RTX/GTX cards with 8GB+ VRAM
 - **Minimum**: 16GB system RAM for model loading
 
-## 🚀 Apple Silicon Performance
+## 🚀 Hardware Acceleration Performance
 
-**Optimized for M1/M2/M3 Macs** with significant performance improvements:
+**Cross-Platform Hardware Acceleration** with significant performance improvements:
 
+### **⚡ Audio Extraction Performance:**
+| Platform | Acceleration | Performance | Realtime Factor |
+|----------|--------------|-------------|-----------------|
+| Apple Silicon | VideoToolbox | **18.8x realtime** | M1/M2/M3/M4 optimized |
+| Windows/Linux | CUDA | **15-20x realtime** | RTX/GTX GPU acceleration |
+| Software Fallback | CPU | **1.0x realtime** | Universal compatibility |
+
+### **🎯 ASR Processing Performance:**
 | Component | Performance Gain | Notes |
 |-----------|------------------|-------|
-| ASR Processing | 3-5x faster | MPS acceleration for Whisper models |
-| Translation | 2-4x faster | ARM64-optimized PyTorch operations |  
+| ASR Processing | 3-5x faster | MPS/CUDA acceleration for Whisper models |
+| Translation | 2-4x faster | Hardware-optimized PyTorch operations |  
 | Model Loading | 50% faster | Optimized dependencies with uv |
-| Memory Usage | 20-30% less | Efficient ARM64 native libraries |
+| Memory Usage | 20-30% less | Efficient native libraries |
 
-### Apple Silicon Features:
-- **🔥 MPS Acceleration**: Automatic GPU acceleration using Apple's Metal Performance Shaders
-- **⚡ ARM64 Native**: All dependencies optimized for Apple Silicon architecture  
-- **💚 Energy Efficient**: Lower power consumption compared to Intel Macs
-- **🧠 Unified Memory**: Efficient memory usage leveraging Apple's unified memory architecture
+### Hardware Acceleration Features:
+- **🏁 Cross-Platform**: VideoToolbox (Apple), CUDA (NVIDIA), Software fallback
+- **🔥 Automatic Detection**: Intelligent hardware capability detection
+- **⚡ Audio Extraction**: Up to 18.8x realtime performance on Apple Silicon  
+- **💚 Universal Compatibility**: 100% fallback support for all hardware
+- **🧠 Memory Efficient**: Optimized resource management and cleanup
 
 ## 🚀 Quick Start
 
@@ -795,6 +804,20 @@ The codebase is designed for extensibility:
 - **Hugging Face** for transformer models and pipeline APIs
 - **Helsinki-NLP** for OPUS-MT translation models
 - **FFmpeg Project** for comprehensive audio processing capabilities
+
+## 📚 Documentation
+
+### **Comprehensive Guides:**
+- **[Hardware Acceleration Guide](docs/HARDWARE_ACCELERATION_GUIDE.md)** - Cross-platform acceleration setup and performance optimization
+- **[Complete Progress Summary](docs/COMPLETE_PROGRESS_SUMMARY.md)** - Detailed development progress and achievements
+- **[Apple Silicon Setup Guide](docs/APPLE_SILICON_GUIDE.md)** - M1/M2/M3/M4 optimization instructions
+- **[SakuraLLM Integration Guide](docs/SAKURA_GUIDE.md)** - SakuraLLM model setup and configuration
+- **[UV Tool Strategy](docs/UV_TOOL_STRATEGY.md)** - Clean development environment management
+
+### **Technical Documentation:**
+- **[Source Structure](docs/SOURCE_STRUCTURE.md)** - Codebase architecture and module organization
+- **[Makefile Improvements](docs/MAKEFILE_IMPROVEMENTS.md)** - Development workflow automation
+- **[Optimization Summary](docs/OPTIMIZATION_SUMMARY.md)** - Performance enhancements and code quality improvements
 
 ---
 

@@ -134,7 +134,7 @@ class TranslationPipeline(LoggerMixin):
                     self.logger.info("Step 1: Japanese → Simplified Chinese (SakuraLLM)")
                     zh_hans_results = self.sakura_translator.translate_batch(
                         texts,
-                        progress_callback=lambda p: (
+                        progress_callback=lambda msg, p: (
                             progress_callback("translation", p * 0.7)  # 70% for SakuraLLM
                             if progress_callback
                             else None
