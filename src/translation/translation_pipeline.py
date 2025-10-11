@@ -5,6 +5,7 @@ from typing import List, Dict, Optional, Callable, Any
 from pathlib import Path
 
 from .huggingface_translator import HuggingFaceTranslator, MultiStageTranslator
+from .sakura_translator import SakuraTranslator
 from ..models.subtitle_data import SubtitleSegment, TranslationResult, SubtitleFile
 from ..utils.config import Config
 from ..utils.logger import LoggerMixin
@@ -23,27 +24,36 @@ class TranslationPipeline(LoggerMixin):
         """
         self.config = config
         self.translation_config = config.get_translation_config()
+        self.sakura_config = config.get_sakura_config()
         
         # Initialize translators
         self.multi_stage_translator = None
+        self.sakura_translator = None
         self._initialize_translators()
     
     def _initialize_translators(self):
-        """Initialize translation models."""
+        """Initialize translation models based on configuration."""
         try:
-            self.multi_stage_translator = MultiStageTranslator(
-                ja_en_model=self.translation_config.get("ja_to_en_model", "Helsinki-NLP/opus-mt-ja-en"),
-                en_zh_model=self.translation_config.get("en_to_zh_model", "Helsinki-NLP/opus-mt-en-zh"),
-                device=self.translation_config.get("device", "auto"),
-                batch_size=self.translation_config.get("batch_size", 8),
-                max_length=self.translation_config.get("max_length", 512)
-            )
-            
-            self.logger.info("Translation pipeline initialized")
+            # Check if SakuraLLM is enabled
+            if self.config.is_sakura_enabled():
+                self.logger.info("🌸 Initializing SakuraLLM translator")
+                self.sakura_translator = SakuraTranslator.create_from_config(self.config)
+                self.logger.info("🌸 SakuraLLM translator initialized for Japanese→Chinese")
+            else:
+                self.logger.info("Initializing standard multi-stage translator")
+                self.multi_stage_translator = MultiStageTranslator(
+                    ja_en_model=self.translation_config.get("ja_to_en_model", "Helsinki-NLP/opus-mt-ja-en"),
+                    en_zh_model=self.translation_config.get("en_to_zh_model", "Helsinki-NLP/opus-mt-en-zh"),
+                    device=self.translation_config.get("device", "auto"),
+                    batch_size=self.translation_config.get("batch_size", 8),
+                    max_length=self.translation_config.get("max_length", 512)
+                )
+                self.logger.info("Standard translation pipeline initialized")
             
         except Exception as e:
             self.logger.error(f"Error initializing translation pipeline: {e}")
             self.multi_stage_translator = None
+            self.sakura_translator = None
     
     def load_models(self) -> bool:
         """Load all translation models.
@@ -51,10 +61,17 @@ class TranslationPipeline(LoggerMixin):
         Returns:
             True if successful, False otherwise
         """
-        if self.multi_stage_translator is None:
+        if self.sakura_translator is None and self.multi_stage_translator is None:
             self._initialize_translators()
         
+        # Load SakuraLLM if enabled
+        if self.sakura_translator:
+            self.logger.info("🌸 Loading SakuraLLM model...")
+            return self.sakura_translator.load_model()
+        
+        # Load standard translator if SakuraLLM not enabled
         if self.multi_stage_translator:
+            self.logger.info("Loading standard translation models...")
             return self.multi_stage_translator.load_models()
         
         return False
@@ -91,14 +108,36 @@ class TranslationPipeline(LoggerMixin):
             
             self.logger.info(f"Translating {len(texts)} segments to {target_languages}")
             
-            # Perform multi-stage translation
+            # Perform translation based on enabled translator
             if progress_callback:
                 progress_callback("translation", 0.0)
             
-            translation_results = self.multi_stage_translator.translate_to_both(
-                texts,
-                progress_callback=lambda p: progress_callback("translation", p) if progress_callback else None
-            )
+            if self.sakura_translator:
+                # Use SakuraLLM for direct Japanese→Chinese translation
+                self.logger.info("🌸 Using SakuraLLM for Japanese→Chinese translation")
+                
+                # SakuraLLM only does Japanese→Chinese, so filter target languages
+                if 'zh' in target_languages:
+                    zh_results = self.sakura_translator.translate_batch(
+                        texts,
+                        progress_callback=lambda p: progress_callback("translation", p) if progress_callback else None
+                    )
+                    translation_results = {'zh': zh_results}
+                    
+                    # If English is also requested, we need to use standard translator for that
+                    if 'en' in target_languages:
+                        self.logger.info("Japanese→English requires standard translator alongside SakuraLLM")
+                        # We could initialize a single-stage translator here if needed
+                        translation_results['en'] = []  # For now, skip English when using SakuraLLM
+                else:
+                    self.logger.warning("SakuraLLM only supports Japanese→Chinese. Skipping other languages.")
+                    translation_results = {}
+            else:
+                # Use standard multi-stage translator
+                translation_results = self.multi_stage_translator.translate_to_both(
+                    texts,
+                    progress_callback=lambda p: progress_callback("translation", p) if progress_callback else None
+                )
             
             # Add translations to subtitle file
             for lang_code, results in translation_results.items():
@@ -130,28 +169,38 @@ class TranslationPipeline(LoggerMixin):
             List of translation results
         """
         try:
-            # For now, we support ja->en and en->zh through multi-stage
-            if target_language == 'en':
-                # Direct Japanese to English
-                if not self.multi_stage_translator.ja_en_translator.is_loaded:
-                    if not self.multi_stage_translator.ja_en_translator.load_model():
-                        return []
-                
-                texts = [segment.text for segment in segments]
-                return self.multi_stage_translator.ja_en_translator.translate_batch(
-                    texts, progress_callback
-                )
+            texts = [segment.text for segment in segments]
             
-            elif target_language == 'zh':
-                # Two-stage: ja->en->zh
-                texts = [segment.text for segment in segments]
-                results = self.multi_stage_translator.translate_to_both(
-                    texts, progress_callback
-                )
-                return results.get('zh', [])
+            # Use SakuraLLM for Chinese if enabled
+            if target_language == 'zh' and self.sakura_translator:
+                self.logger.info("🌸 Using SakuraLLM for Japanese→Chinese translation")
+                return self.sakura_translator.translate_batch(texts, progress_callback)
+            
+            # Use standard translator for other cases
+            elif self.multi_stage_translator:
+                if target_language == 'en':
+                    # Direct Japanese to English
+                    if not self.multi_stage_translator.ja_en_translator.is_loaded:
+                        if not self.multi_stage_translator.ja_en_translator.load_model():
+                            return []
+                    
+                    return self.multi_stage_translator.ja_en_translator.translate_batch(
+                        texts, progress_callback
+                    )
+                
+                elif target_language == 'zh':
+                    # Two-stage: ja->en->zh (when SakuraLLM not enabled)
+                    results = self.multi_stage_translator.translate_to_both(
+                        texts, progress_callback
+                    )
+                    return results.get('zh', [])
+                
+                else:
+                    self.logger.error(f"Unsupported target language: {target_language}")
+                    return []
             
             else:
-                self.logger.error(f"Unsupported target language: {target_language}")
+                self.logger.error("No translation models available")
                 return []
                 
         except Exception as e:
@@ -229,10 +278,80 @@ class TranslationPipeline(LoggerMixin):
     
     def unload_models(self):
         """Unload all translation models to free memory."""
+        if self.sakura_translator:
+            self.sakura_translator.unload_model()
+            self.logger.info("🌸 SakuraLLM model unloaded")
+        
         if self.multi_stage_translator:
             self.multi_stage_translator.unload_models()
+            self.logger.info("Multi-stage translation models unloaded")
         
-        self.logger.info("Translation models unloaded")
+        self.logger.info("All translation models unloaded")
+    
+    def get_active_translator_info(self) -> Dict[str, Any]:
+        """Get information about the currently active translator.
+        
+        Returns:
+            Dictionary with translator information
+        """
+        if self.sakura_translator:
+            return {
+                "type": "SakuraLLM",
+                "model": self.sakura_config.get("model_name"),
+                "specialization": "Japanese → Chinese (High Quality)",
+                "device": self.sakura_config.get("device"),
+                "enabled": True,
+                "icon": "🌸"
+            }
+        elif self.multi_stage_translator:
+            return {
+                "type": "Multi-Stage",
+                "ja_en_model": self.translation_config.get("ja_to_en_model"),
+                "en_zh_model": self.translation_config.get("en_to_zh_model"),
+                "specialization": "Japanese → English → Chinese",
+                "device": self.translation_config.get("device"),
+                "enabled": True,
+                "icon": "🔄"
+            }
+        else:
+            return {
+                "type": "None",
+                "enabled": False,
+                "error": "No translator initialized"
+            }
+    
+    def is_sakura_active(self) -> bool:
+        """Check if SakuraLLM is the active translator.
+        
+        Returns:
+            True if SakuraLLM is active, False otherwise
+        """
+        return self.sakura_translator is not None and self.config.is_sakura_enabled()
+    
+    def get_supported_languages(self) -> Dict[str, List[str]]:
+        """Get supported language pairs for the active translator.
+        
+        Returns:
+            Dictionary with source and target languages
+        """
+        if self.sakura_translator:
+            return {
+                "source": ["ja"],
+                "target": ["zh"],
+                "note": "SakuraLLM specializes in Japanese→Chinese translation"
+            }
+        elif self.multi_stage_translator:
+            return {
+                "source": ["ja"],
+                "target": ["en", "zh"],
+                "note": "Multi-stage: ja→en and ja→en→zh"
+            }
+        else:
+            return {
+                "source": [],
+                "target": [],
+                "note": "No translator available"
+            }
     
     def __enter__(self):
         """Context manager entry."""

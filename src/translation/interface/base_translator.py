@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Callable, Dict, Any
 import logging
 
-from ..models.subtitle_data import SubtitleSegment, TranslationResult
+from ...models.subtitle_data import SubtitleSegment, TranslationResult
 
 logger = logging.getLogger(__name__)
 

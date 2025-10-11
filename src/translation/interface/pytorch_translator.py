@@ -5,8 +5,8 @@ import torch
 from typing import List, Optional, Callable, Dict, Any
 
 from .base_translator import BaseTranslator
-from ..models.subtitle_data import TranslationResult
-from ..utils.logger import LoggerMixin
+from ...models.subtitle_data import TranslationResult
+from ...utils.logger import LoggerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -280,9 +280,20 @@ class PyTorchTranslator(BaseTranslator, LoggerMixin):
         Returns:
             Formatted prompt
         """
-        # Customize this based on your specific model's prompt format
-        # This is a generic example - adjust for your model
+        # SakuraLLM-specific prompt format
+        if "Sakura" in self.model_name and self.source_lang == "ja" and self.target_lang == "zh":
+            # SakuraLLM ChatML format for Japanese → Chinese
+            system_prompt = "你是一个轻小说翻译模型，可以流畅通顺地以日本轻小说的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，不擅自添加原文中没有的代词。"
+            user_prompt = f"将下面的日文文本翻译成中文：{text}"
+            
+            prompt = (
+                f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+                f"<|im_start|>user\n{user_prompt}<|im_end|>\n"
+                f"<|im_start|>assistant\n"
+            )
+            return prompt
         
+        # Generic prompts for other models
         if self.source_lang == "ja" and self.target_lang == "en":
             prompt = f"Translate the following Japanese text to English:\n\nJapanese: {text}\nEnglish:"
         elif self.source_lang == "en" and self.target_lang == "zh":

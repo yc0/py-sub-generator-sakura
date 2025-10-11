@@ -4,7 +4,7 @@ import logging
 from typing import List, Optional, Callable, Dict, Any
 import numpy as np
 
-from .base_translator import BaseTranslator
+from .interface.base_translator import BaseTranslator
 from ..models.subtitle_data import TranslationResult
 from ..utils.logger import LoggerMixin
 
@@ -55,16 +55,25 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
             self.logger.info(f"Loading translation model: {self.model_name}")
             self.logger.info(f"Translation: {self.source_lang} -> {self.target_lang}")
             
-            # Determine torch_dtype based on device
-            torch_dtype = torch.float16 if self.device == "cuda" else torch.float32
+            # Determine torch_dtype and device for pipeline
+            if self.device == "cuda" or self.device.startswith("cuda"):
+                pipeline_device = 0  # Use first CUDA device
+                torch_dtype = torch.float16
+            elif self.device == "mps":
+                pipeline_device = "mps"  # Use MPS device directly
+                torch_dtype = torch.float32  # MPS works better with float32
+            else:
+                pipeline_device = -1  # CPU
+                torch_dtype = torch.float32
             
-            # Create pipeline
+            # Create pipeline with consistent format preference
             self.pipeline = pipeline(
                 "translation",
                 model=self.model_name,
-                device=0 if self.device == "cuda" else -1,
+                device=pipeline_device,
                 torch_dtype=torch_dtype,
                 max_length=self.max_length,
+                use_safetensors=True,  # Prefer safetensors format consistently
                 **self.pipeline_kwargs
             )
             
