@@ -64,16 +64,23 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 pipeline_device = "mps"  # Use MPS device directly
                 torch_dtype = torch.float32  # MPS works better with float32
             else:
-                pipeline_device = -1  # CPU
+                pipeline_device = "cpu"  # Explicitly use "cpu" string instead of -1
                 torch_dtype = torch.float32
 
-            # Create pipeline with proper configuration
+            # Create pipeline with explicit device specification to avoid meta device
+            # Use model_kwargs to control device mapping more directly
+            model_kwargs = {
+                "torch_dtype": torch_dtype,
+                "device_map": None,  # Explicitly disable auto device mapping
+                "low_cpu_mem_usage": False,  # Disable to avoid meta tensor issues
+            }
+            
             self.pipeline = pipeline(
                 "translation",
                 model=self.model_name,
                 device=pipeline_device,
-                torch_dtype=torch_dtype,
                 max_length=self.max_length,
+                model_kwargs=model_kwargs,
                 **self.pipeline_kwargs,
             )
 

@@ -30,30 +30,30 @@ help:
 	@echo "  make test-gpu          # Test GPU acceleration"
 	@echo "  make test-coverage     # Generate coverage report"
 
-# Testing commands
+# Testing commands (project-scoped)
 test:
 	@echo "🧪 Running fast tests..."
-	./run_tests.py --type fast
+	uv run python run_tests.py --type fast
 
 test-unit:
 	@echo "🧪 Running unit tests..."
-	./run_tests.py --type unit -v
+	uv run python run_tests.py --type unit -v
 
 test-gpu:
 	@echo "🧪 Running GPU tests..."
-	./run_tests.py --type gpu --gpu -v
+	uv run python run_tests.py --type gpu --gpu -v
 
 test-slow:
 	@echo "🧪 Running slow tests (may download models)..."
-	./run_tests.py --type slow -v
+	uv run python run_tests.py --type slow -v
 
 test-all:
 	@echo "🧪 Running all tests..."
-	./run_tests.py --type all --gpu -v
+	uv run python run_tests.py --type all --gpu -v
 
 test-coverage:
 	@echo "🧪 Running tests with coverage..."
-	./run_tests.py --type fast --coverage
+	uv run python run_tests.py --type fast --coverage
 	@echo "📊 Coverage report generated in htmlcov/"
 
 # Installation commands
