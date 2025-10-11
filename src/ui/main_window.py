@@ -404,7 +404,7 @@ class MainWindow(LoggerMixin):
         
         # Add to results text
         if progress == 1.0:
-            self._add_result_text(f"✅ {stage_name} completed\\n")
+            self._add_result_text(f"✅ {stage_name} completed\n")
     
     def _processing_completed(self, subtitle_file: Optional[SubtitleFile]):
         """Handle processing completion (called on main thread)."""
@@ -425,7 +425,7 @@ class MainWindow(LoggerMixin):
             
         else:
             self.status_var.set("❌ Subtitle generation failed")
-            self._add_result_text("\\n❌ Processing failed. Check the log for details.\\n")
+            self._add_result_text("\n❌ Processing failed. Check the log for details.\n")
         
         self.progress_var.set(0)
     
@@ -436,22 +436,22 @@ class MainWindow(LoggerMixin):
         self.cancel_btn.config(state=tk.DISABLED)
         
         self.status_var.set("❌ Error during processing")
-        self._add_result_text(f"\\n❌ Error: {error_message}\\n")
+        self._add_result_text(f"\n❌ Error: {error_message}\n")
         
         self.progress_var.set(0)
     
     def _show_processing_results(self, subtitle_file: SubtitleFile):
         """Show processing results summary."""
-        self._add_result_text("\\n🎉 Processing Results:\\n")
-        self._add_result_text(f"📊 Generated {len(subtitle_file.segments)} subtitle segments\\n")
+        self._add_result_text("\n🎉 Processing Results:\n")
+        self._add_result_text(f"📊 Generated {len(subtitle_file.segments)} subtitle segments\n")
         
         # Show translation results
         for lang_code, translations in subtitle_file.translations.items():
             lang_names = {'en': 'English', 'zh': 'Traditional Chinese'}
             lang_name = lang_names.get(lang_code, lang_code)
-            self._add_result_text(f"🌐 {lang_name}: {len(translations)} translations\\n")
+            self._add_result_text(f"🌐 {lang_name}: {len(translations)} translations\n")
         
-        self._add_result_text("\\n✨ Ready to preview or export!\\n")
+        self._add_result_text("\n✨ Ready to preview or export!\n")
     
     def cancel_processing(self):
         """Cancel current processing."""
@@ -495,13 +495,13 @@ class MainWindow(LoggerMixin):
             )
             
             if exported_files:
-                self._add_result_text(f"\\n📁 Exported to: {output_path}\\n")
+                self._add_result_text(f"\n📁 Exported to: {output_path}\n")
                 for format_name, file_path in exported_files.items():
-                    self._add_result_text(f"   • {file_path.name}\\n")
+                    self._add_result_text(f"   • {file_path.name}\n")
                 
                 messagebox.showinfo(
                     "Export Complete",
-                    f"Subtitles exported successfully to:\\n{output_path}"
+                    f"Subtitles exported successfully to:\n{output_path}"
                 )
             else:
                 messagebox.showerror("Error", "Failed to export subtitles.")

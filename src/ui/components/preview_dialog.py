@@ -251,7 +251,7 @@ class PreviewDialog:
         if format_type == "SRT":
             return self.subtitle_file.export_srt()
         elif format_type == "Raw Text":
-            return "\\n".join(seg.text for seg in segments if seg.text.strip())
+            return "\n".join(seg.text for seg in segments if seg.text.strip())
         else:  # Formatted
             return self.format_segments_display(segments)
     
@@ -265,7 +265,7 @@ class PreviewDialog:
         if format_type == "SRT":
             return self.subtitle_file.export_srt(lang_code)
         elif format_type == "Raw Text":
-            return "\\n".join(
+            return "\n".join(
                 trans.translated_text 
                 for trans in translations 
                 if trans.translated_text.strip()
@@ -304,7 +304,7 @@ class PreviewDialog:
             lines.append(f"      {segment.text}")
             lines.append("")  # Empty line
         
-        return "\\n".join(lines)
+        return "\n".join(lines)
     
     def format_time(self, seconds: float) -> str:
         """Format time in MM:SS.mmm format."""
@@ -361,7 +361,7 @@ class PreviewDialog:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(content)
                 
-                tk.messagebox.showinfo("Export Complete", f"Preview exported to:\\n{file_path}")
+                tk.messagebox.showinfo("Export Complete", f"Preview exported to:\n{file_path}")
                 
         except Exception as e:
             logger.error(f"Error exporting preview: {e}")
