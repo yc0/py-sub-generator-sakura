@@ -6,7 +6,12 @@
 
 ## 🎯 ## 📈 **Commit History (Latest Session)**
 
-1. **ef89d46** - `refactor: Code cleanup and lint fixes across entire codebase`
+1. **ef89d46** - `refactor: Code cleanup and lint fixes acros### 🚀 **Core Capabilities Verified**
+- **ASR Processing**: Native Whisper with MPS/CUDA/CPU support
+- **Translation Pipeline**: Multi-language with HuggingFace and SakuraLLM integration
+- **Dual Language Output**: Generate both original Japanese and translated subtitle files
+- **UI Experience**: Responsive dialogs with persistent settings and advanced options
+- **File Processing**: Complete video-to-subtitle workflow with flexible outputire codebase`
 2. **867c0ee** - `fix: Remove duplicate format target in Makefile`
 3. **e99fac3** - `fix: Resolve make test commands and meta tensor issues`
 4. **ecb13df** - `fix: Update config and translation for native Whisper compatibility`
@@ -196,7 +201,8 @@ generated_ids = model.generate(input_features=features,
 #### **Production Readiness Validation:**
 - **Core ASR functionality**: ✅ Verified working (native Whisper implementation)
 - **Translation pipeline**: ✅ Verified working (multi-language support)
-- **Configuration management**: ✅ Clean and persistent
+- **Dual language output**: ✅ Verified working (customizable Japanese + translated files)
+- **Configuration management**: ✅ Clean and persistent with advanced options
 - **Development workflow**: ✅ Streamlined with project-scoped tools
 
 ---
@@ -235,9 +241,10 @@ This session represents a **complete transformation** from experimental codebase
 ### 🌟 **Major Accomplishments**
 1. **Native Whisper Implementation** - Zero warnings, production-grade quality
 2. **Project-Scoped Development Workflow** - Clean, modern tooling approach  
-3. **Comprehensive Documentation** - Complete progress tracking and technical guides
-4. **Quality Codebase** - Lint-free, maintainable, following best practices
-5. **Verified Production Readiness** - All core functionality validated working
+3. **Dual Language Subtitle Generation** - Japanese + translated files with UI controls
+4. **Comprehensive Documentation** - Complete progress tracking and technical guides
+5. **Quality Codebase** - Lint-free, maintainable, following best practices
+6. **Verified Production Readiness** - All core functionality validated working
 
 ### 🚀 **Ready For Production Use**
 ✅ **Professional Video Production** - Reliable, high-quality ASR processing  
