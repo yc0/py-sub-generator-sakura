@@ -90,12 +90,6 @@ check-tools:
 	@echo "💡 Tools are used on-demand without global installation!"
 	@echo "   This keeps your global environment clean while providing access to latest versions."
 
-# Development commands
-format:
-	@echo "🎨 Formatting code..."
-	@uv tool run black src/ tests/ --line-length 88
-	@uv tool run isort src/ tests/ --profile black
-
 # Code quality checks (project-scoped tools)
 lint:
 	@echo "🔍 Running comprehensive code quality checks..."
