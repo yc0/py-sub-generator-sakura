@@ -14,7 +14,7 @@ from src.translation.huggingface_translator import (
     HuggingFaceTranslator,
     MultiStageTranslator,
 )
-from src.translation.interface.pytorch_translator import PyTorchTranslator
+# PyTorchTranslator removed - using llama-cpp-python directly for SakuraLLM
 
 
 class TestHuggingFaceTranslator:
@@ -142,88 +142,7 @@ class TestHuggingFaceTranslator:
         assert empty_result == ""
 
 
-class TestPyTorchTranslator:
-    """Test PyTorch direct model translator."""
-
-    def test_initialization(self):
-        """Test PyTorch translator initialization."""
-        translator = PyTorchTranslator(
-            model_name="dummy-model",
-            source_lang="ja",
-            target_lang="zh",
-            device="cpu",
-            force_gpu=False,
-        )
-
-        assert translator.model_name == "dummy-model"
-        assert translator.source_lang == "ja"
-        assert translator.target_lang == "zh"
-        assert translator.force_gpu == False
-        assert translator.optimal_device == "cpu"
-
-    def test_sakura_prompt_formatting(self):
-        """Test SakuraLLM-specific prompt formatting."""
-        translator = PyTorchTranslator(
-            model_name="SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
-            source_lang="ja",
-            target_lang="zh",
-            device="cpu",
-            force_gpu=False,
-        )
-
-        test_text = "こんにちは"
-        prompt = translator._create_translation_prompt(test_text)
-
-        # Should use ChatML format for SakuraLLM
-        assert "<|im_start|>system" in prompt
-        assert "<|im_start|>user" in prompt
-        assert "<|im_start|>assistant" in prompt
-        assert "轻小说翻译模型" in prompt
-        assert test_text in prompt
-
-    def test_generic_prompt_formatting(self):
-        """Test generic prompt formatting."""
-        translator = PyTorchTranslator(
-            model_name="some-generic-model",
-            source_lang="ja",
-            target_lang="en",
-            device="cpu",
-            force_gpu=False,
-        )
-
-        test_text = "こんにちは"
-        prompt = translator._create_translation_prompt(test_text)
-
-        # Should use generic format
-        assert "Translate the following Japanese text to English" in prompt
-        assert test_text in prompt
-
-    def test_recommended_config(self):
-        """Test recommended configuration generation."""
-        config = PyTorchTranslator.get_recommended_config()
-
-        assert isinstance(config, dict)
-        assert "batch_size" in config
-        assert "max_length" in config
-        assert "torch_dtype" in config
-        assert "device" in config
-        assert config["device"] == "auto"
-        assert config["force_gpu"] == True
-
-    @pytest.mark.gpu
-    def test_gpu_optimizations_config(self, optimal_device):
-        """Test GPU-specific optimizations."""
-        translator = PyTorchTranslator(
-            model_name="dummy",
-            source_lang="ja",
-            target_lang="en",
-            device=optimal_device,
-            torch_dtype="float16",
-        )
-
-        assert translator.optimal_device == optimal_device
-        if optimal_device != "cpu":
-            assert translator.torch_dtype == torch.float16
+# TestPyTorchTranslator class removed - using llama-cpp-python directly for SakuraLLM
 
 
 class TestMultiStageTranslator:

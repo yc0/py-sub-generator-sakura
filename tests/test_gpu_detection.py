@@ -10,8 +10,8 @@ from unittest.mock import Mock, patch
 import pytest
 import torch
 
-from src.translation.interface.base_translator import BaseTranslator
-from src.translation.interface.pytorch_translator import PyTorchTranslator
+from src.translation.base_translator import BaseTranslator
+# PyTorchTranslator removed - using llama-cpp-python directly for SakuraLLM
 
 
 class TestGPUDetection:
@@ -66,39 +66,7 @@ class TestGPUDetection:
         translator_cpu = MockTranslator("dummy", "ja", "en", device="cpu")
         assert translator_cpu.device == "cpu"
 
-    @pytest.mark.gpu
-    def test_pytorch_translator_device_detection(self, optimal_device):
-        """Test PyTorchTranslator optimal device detection."""
-        translator = PyTorchTranslator(
-            model_name="dummy", source_lang="ja", target_lang="en", device="auto"
-        )
-
-        assert translator.optimal_device in ["cuda", "mps", "cpu"]
-
-        # On systems with GPU, should not be CPU unless forced
-        gpu_available = torch.cuda.is_available() or (
-            hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-        )
-
-        if gpu_available:
-            assert translator.optimal_device != "cpu"
-
-    def test_force_gpu_behavior(self):
-        """Test force_gpu parameter behavior."""
-        # Mock no GPU available
-        with patch("torch.cuda.is_available", return_value=False), patch(
-            "torch.backends.mps.is_available", return_value=False
-        ):
-
-            # Should raise error when force_gpu=True and no GPU
-            with pytest.raises(RuntimeError, match="GPU acceleration required"):
-                PyTorchTranslator(
-                    model_name="dummy",
-                    source_lang="ja",
-                    target_lang="en",
-                    device="auto",
-                    force_gpu=True,
-                )
+    # PyTorchTranslator tests removed - using llama-cpp-python directly for SakuraLLM
 
 
 class TestSystemInfo:

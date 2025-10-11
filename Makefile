@@ -25,36 +25,66 @@ help:
 	@echo "  lint          Run linting with ruff and mypy"
 	@echo "  clean         Clean cache and temporary files"
 	@echo ""
+	@echo "E2E Testing:"
+	@echo "  test-e2e      Run SakuraLLM pipeline demo"
+	@echo "  test-e2e-integration  Run integration tests"
+	@echo "  test-e2e-all  Run all e2e verification tests"
+	@echo ""
+	@echo "Examples & Demos:"
+	@echo "  demo-sakura   Run SakuraLLM translation demo"
+	@echo "  demo-14b      Compare 7B vs 14B models"
+	@echo "  demo-3lang    Three-language pipeline demo"
+	@echo "  download-models  Download SakuraLLM models"
+	@echo ""
 	@echo "Examples:"
-	@echo "  make test              # Quick tests"
-	@echo "  make test-gpu          # Test GPU acceleration"
+	@echo "  make test-e2e          # Quick e2e verification"
+	@echo "  make demo-sakura       # Try SakuraLLM pipeline"
 	@echo "  make test-coverage     # Generate coverage report"
 
 # Testing commands (project-scoped)
 test:
 	@echo "🧪 Running fast tests..."
-	uv run python run_tests.py --type fast
+	uv run python tools/run_tests.py --type fast
 
 test-unit:
 	@echo "🧪 Running unit tests..."
-	uv run python run_tests.py --type unit -v
+	uv run python tools/run_tests.py --type unit -v
 
 test-gpu:
 	@echo "🧪 Running GPU tests..."
-	uv run python run_tests.py --type gpu --gpu -v
+	uv run python tools/run_tests.py --type gpu --gpu -v
 
 test-slow:
 	@echo "🧪 Running slow tests (may download models)..."
-	uv run python run_tests.py --type slow -v
+	uv run python tools/run_tests.py --type slow -v
 
 test-all:
 	@echo "🧪 Running all tests..."
-	uv run python run_tests.py --type all --gpu -v
+	uv run python tools/run_tests.py --type all --gpu -v
 
 test-coverage:
 	@echo "🧪 Running tests with coverage..."
-	uv run python run_tests.py --type fast --coverage
+	uv run python tools/run_tests.py --type fast --coverage
 	@echo "📊 Coverage report generated in htmlcov/"
+
+# E2E Testing - The commands I keep running to verify integrity
+test-e2e:
+	@echo "🔄 Running end-to-end SakuraLLM pipeline test..."
+	uv run python examples/demo_sakura_translation.py
+
+test-e2e-integration:
+	@echo "🔄 Running integration test pipeline..."
+	uv run python -m pytest tests/integration/test_audio_pipeline_e2e.py::TestAudioPipelineE2E::test_complete_audio_pipeline_hf_only -v
+
+test-e2e-all:
+	@echo "🔄 Running all e2e verification tests..."
+	@echo "1️⃣ SakuraLLM Pipeline Test:"
+	@$(MAKE) test-e2e
+	@echo ""
+	@echo "2️⃣ Integration Test:"
+	@$(MAKE) test-e2e-integration
+	@echo ""
+	@echo "✅ All E2E tests completed!"
 
 # Installation commands
 install:
@@ -141,14 +171,35 @@ clean-cache:
 	rm -rf ~/.cache/huggingface/hub/models--Helsinki-NLP--*
 	rm -rf ~/.cache/huggingface/hub/models--openai--whisper-*
 
-# Model management
+# Examples and Demos
+demo-sakura:
+	@echo "🌸 Running SakuraLLM translation demo..."
+	uv run python examples/demo_sakura_translation.py
+
+demo-14b:
+	@echo "🔥 Running SakuraLLM 14B vs 7B comparison..."
+	uv run python examples/demo_sakura_14b_test.py
+
+demo-3lang:
+	@echo "🌍 Running three-language pipeline demo..."
+	uv run python examples/demo_three_languages.py
+
+# Model management  
 download-models:
-	@echo "📥 Pre-downloading models..."
-	uv run python -c "from old_tests.predownload_models import predownload_models; predownload_models()"
+	@echo "📥 Downloading SakuraLLM models..."
+	uv run python examples/download_sakura_models.py
+
+download-7b:
+	@echo "📥 Downloading SakuraLLM 7B model..."
+	echo "7b" | uv run python examples/download_sakura_models.py
+
+download-14b:
+	@echo "📥 Downloading SakuraLLM 14B model..."
+	echo "14b" | uv run python examples/download_sakura_models.py
 
 benchmark:
 	@echo "⚡ Running performance benchmarks..."
-	./run_tests.py --type slow -k benchmark -v
+	uv run python tools/run_tests.py --type slow -k benchmark -v
 
 # Docker support (if needed)
 docker-build:
@@ -164,10 +215,15 @@ docs:
 	@echo "📚 Generating documentation..."
 	@echo "README.md and inline docs are the primary documentation"
 
+# Apple Silicon setup
+setup-apple:
+	@echo "🍎 Running Apple Silicon optimization setup..."
+	uv run python tools/setup_apple_silicon.py
+
 # CI/CD helpers
 ci-test:
 	@echo "🤖 Running CI tests..."
-	./run_tests.py --type no-download --coverage
+	uv run python tools/run_tests.py --type no-download --coverage
 
 check-setup:
 	@echo "🔍 Checking project setup..."

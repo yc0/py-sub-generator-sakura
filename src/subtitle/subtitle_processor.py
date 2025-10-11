@@ -1,13 +1,11 @@
 """Subtitle processing utilities for post-processing and optimization."""
 
-import logging
 import re
 from typing import Any, Dict, List
 
 from ..models.subtitle_data import SubtitleSegment
 from ..utils.logger import LoggerMixin
 
-logger = logging.getLogger(__name__)
 
 
 class SubtitleProcessor(LoggerMixin):

@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from src.models.subtitle_data import TranslationResult
-from src.translation.sakura_translator import SakuraTranslator
+from src.translation.sakura_translator_llama_cpp import SakuraTranslator
 from src.utils.config import Config
 
 

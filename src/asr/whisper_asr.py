@@ -1,6 +1,6 @@
 """Whisper ASR implementation using native Whisper generate() method."""
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import torch
@@ -154,7 +154,7 @@ class WhisperASR(BaseASR, LoggerMixin):
             for key, value in self.generation_kwargs.items():
                 if key not in invalid_params:
                     valid_kwargs[key] = value
-            
+
             self.generation_config.update(valid_kwargs)
 
             self.is_loaded = True
@@ -237,10 +237,10 @@ class WhisperASR(BaseASR, LoggerMixin):
             self.logger.info(
                 f"Native transcription completed: {len(segments)} segments"
             )
-            
+
             if len(segments) == 0:
                 self.logger.warning("No segments produced - this indicates the model generated no meaningful transcription")
-                
+
             return segments
 
         except Exception as e:
@@ -451,7 +451,7 @@ class WhisperASR(BaseASR, LoggerMixin):
                 decoded_text = self.tokenizer.decode(
                     new_tokens, skip_special_tokens=True
                 )
-                
+
                 if decoded_text.strip():
                     segment = SubtitleSegment(
                         start_time=0.0,
@@ -486,7 +486,7 @@ class WhisperASR(BaseASR, LoggerMixin):
         try:
             # Clean the decoded text (remove special tokens that aren't timestamps)
             cleaned_text = decoded_text.strip()
-            
+
             # Remove common non-timestamp special tokens
             cleaned_text = re.sub(r'<\|startoftranscript\|>', '', cleaned_text)
             cleaned_text = re.sub(r'<\|endoftranscript\|>', '', cleaned_text)

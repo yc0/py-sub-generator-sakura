@@ -22,6 +22,41 @@ class AudioProcessor:
             target_sample_rate: Target sample rate for ASR models (default: 16kHz)
         """
         self.target_sample_rate = target_sample_rate
+        self.hwaccel = self._detect_hardware_acceleration()
+
+    def _detect_hardware_acceleration(self) -> Optional[str]:
+        """Detect the best available hardware acceleration.
+        
+        Returns:
+            Hardware acceleration method or None for software fallback
+        """
+        try:
+            import subprocess
+            import platform
+            
+            # Get available hardware accelerators
+            result = subprocess.run(
+                ["ffmpeg", "-hwaccels"], 
+                capture_output=True, 
+                text=True, 
+                check=True
+            )
+            available_hwaccels = result.stdout.lower()
+            
+            # Priority order: CUDA > VideoToolbox > software
+            if "cuda" in available_hwaccels:
+                logger.info("Using CUDA hardware acceleration")
+                return "cuda"
+            elif "videotoolbox" in available_hwaccels and platform.system() == "Darwin":
+                logger.info("Using VideoToolbox hardware acceleration (Apple Silicon)")
+                return "videotoolbox"
+            else:
+                logger.info("Using software decoding (no hardware acceleration available)")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"Could not detect hardware acceleration: {e}")
+            return None
 
     def extract_audio_from_video(self, video_file: VideoFile) -> Optional[AudioData]:
         """Extract audio from video file.
@@ -42,18 +77,8 @@ class AudioProcessor:
             temp_audio_path = temp_audio.name
             temp_audio.close()
 
-            # Use ffmpeg to extract audio
-            (
-                ffmpeg.input(str(video_file.file_path))
-                .output(
-                    temp_audio_path,
-                    acodec="pcm_s16le",  # 16-bit PCM
-                    ar=self.target_sample_rate,  # Target sample rate
-                    ac=1,  # Mono channel
-                )
-                .overwrite_output()
-                .run(quiet=True)
-            )
+            # Use ffmpeg with hardware acceleration to extract audio
+            self._extract_audio_with_fallback(video_file.file_path, temp_audio_path)
 
             # Load audio data
             audio_data = self.load_audio_file(Path(temp_audio_path))
@@ -71,6 +96,49 @@ class AudioProcessor:
         except Exception as e:
             logger.error(f"Error extracting audio: {e}")
             return None
+
+    def _extract_audio_with_fallback(self, input_path: Path, output_path: str) -> None:
+        """Extract audio with hardware acceleration and software fallback.
+        
+        Args:
+            input_path: Input video file path
+            output_path: Output audio file path
+        """
+        import ffmpeg
+        
+        # Try hardware acceleration first
+        if self.hwaccel:
+            try:
+                (
+                    ffmpeg.input(str(input_path), hwaccel=self.hwaccel)
+                    .output(
+                        output_path,
+                        acodec="pcm_s16le",  # 16-bit PCM
+                        ar=self.target_sample_rate,  # Target sample rate
+                        ac=1,  # Mono channel
+                    )
+                    .overwrite_output()
+                    .run(quiet=True)
+                )
+                logger.debug(f"Audio extracted using {self.hwaccel} acceleration")
+                return
+            except Exception as e:
+                logger.warning(f"Hardware acceleration failed ({self.hwaccel}): {e}")
+                logger.info("Falling back to software decoding")
+        
+        # Fallback to software decoding
+        (
+            ffmpeg.input(str(input_path))
+            .output(
+                output_path,
+                acodec="pcm_s16le",  # 16-bit PCM
+                ar=self.target_sample_rate,  # Target sample rate
+                ac=1,  # Mono channel
+            )
+            .overwrite_output()
+            .run(quiet=True)
+        )
+        logger.debug("Audio extracted using software decoding")
 
     def load_audio_file(self, audio_path: Path) -> Optional[AudioData]:
         """Load audio file and return AudioData object.

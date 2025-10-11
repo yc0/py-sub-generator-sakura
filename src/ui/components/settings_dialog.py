@@ -33,11 +33,11 @@ class SettingsDialog:
 
         # Use 70% of screen height or minimum 700px, whichever is larger
         dialog_height = max(700, int(screen_height * 0.7))
-        # Use 600px width or 40% of screen width, whichever is smaller
-        dialog_width = min(600, int(screen_width * 0.4))
+        # Outer window 850px to accommodate scrollbar + content without overlap
+        dialog_width = 850
 
         self.dialog.geometry(f"{dialog_width}x{dialog_height}")
-        self.dialog.minsize(550, 650)  # Ensure minimum usable size
+        self.dialog.minsize(850, 650)  # Ensure minimum usable size
         self.dialog.resizable(True, True)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -83,11 +83,64 @@ class SettingsDialog:
 
         self.dialog.geometry(f"+{x}+{y}")
 
+    def _get_available_sakura_models(self):
+        """Get list of available SakuraLLM models from config."""
+        sakura_config = self.config.get_sakura_config()
+        available_models_config = sakura_config.get("available_models", {})
+        
+        model_display_list = []
+        
+        # Add models from available_models config
+        for model_key, model_info in available_models_config.items():
+            description = model_info.get("description", "")
+            vram = model_info.get("vram_required", "Unknown")
+            display_name = f"{model_key} ({vram}) - {description}"
+            model_display_list.append(display_name)
+        
+        # Fallback if no models configured
+        if not model_display_list:
+            model_display_list = [
+                "sakura-7b-v1.0 (8GB) - Balanced 7B parameter model (IQ4_XS quantized) - Recommended",
+                "sakura-14b-v1.0 (16GB) - High-quality 14B parameter model (IQ4_XS quantized) - Best Quality",
+            ]
+        
+        return model_display_list
+
+    def _get_display_name_for_model(self, model_name):
+        """Get display name for a given model name."""
+        sakura_config = self.config.get_sakura_config()
+        available_models_config = sakura_config.get("available_models", {})
+        
+        # Find matching model by model_name
+        for model_key, model_info in available_models_config.items():
+            if model_info.get("model_name") == model_name:
+                description = model_info.get("description", "")
+                vram = model_info.get("vram_required", "Unknown")
+                return f"{model_key} ({vram}) - {description}"
+        
+        # Fallback mapping for compatibility
+        model_mapping = {
+            "SakuraLLM/Sakura-7B-Qwen2.5-v1.0-GGUF": "sakura-7b-v1.0 (8GB) - Balanced 7B parameter model (IQ4_XS quantized) - Recommended",
+            "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF": "sakura-14b-v1.0 (16GB) - High-quality 14B parameter model (IQ4_XS quantized) - Best Quality",
+        }
+        
+        return model_mapping.get(model_name, "sakura-7b-v1.0 (8GB) - Balanced 7B parameter model (IQ4_XS quantized) - Recommended")
+
+    def _get_model_key_from_display(self, display_text):
+        """Extract model key from display text."""
+        # Extract the model key from display format: "sakura-7b-v1.0 (8GB) - Description"
+        if display_text and " (" in display_text:
+            model_key = display_text.split(" (")[0]
+            return model_key
+        
+        # Fallback to default
+        return "sakura-7b-v1.0"
+
     def create_widgets(self):
         """Create dialog widgets."""
         # Main container frame
         main_frame = ttk.Frame(self.dialog)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
 
         # Create scrollable frame for the notebook
         canvas = tk.Canvas(main_frame, highlightthickness=0)
@@ -359,13 +412,12 @@ class SettingsDialog:
             row=0, column=0, sticky=tk.W, pady=5
         )
         self.sakura_model_var = tk.StringVar()
+        # Dynamically get available models from config
+        available_models = self._get_available_sakura_models()
         model_combo = ttk.Combobox(
             self.sakura_frame,
             textvariable=self.sakura_model_var,
-            values=[
-                "sakura-1.5b-v1.0 (3GB VRAM) - Latest, compact",
-                "sakura-14b-v1.0 (16GB VRAM) - Latest, high quality",
-            ],
+            values=available_models,
             state="readonly",
             width=60,
         )
@@ -544,7 +596,7 @@ class SettingsDialog:
 
         # Language suffix customization (initially hidden)
         self.suffix_frame = ttk.LabelFrame(frame, text="File Naming Options", padding="5")
-        
+
         # Original language suffix
         ttk.Label(self.suffix_frame, text="Japanese file suffix:").grid(
             row=0, column=0, sticky=tk.W, pady=2
@@ -554,7 +606,7 @@ class SettingsDialog:
             self.suffix_frame, textvariable=self.original_suffix_var, width=10
         )
         original_suffix_entry.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=2)
-        
+
         # Translated language suffix
         ttk.Label(self.suffix_frame, text="Chinese file suffix:").grid(
             row=1, column=0, sticky=tk.W, pady=2
@@ -653,15 +705,9 @@ class SettingsDialog:
                 "sakura" if is_sakura_enabled else "huggingface"
             )
 
-            # Map model name to display text
+            # Map model name to display text dynamically
             current_model = sakura_config.get("model_name", "")
-            model_mapping = {
-                "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF": "sakura-1.5b-v1.0 (3GB VRAM) - Latest, compact",
-                "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF": "sakura-14b-v1.0 (16GB VRAM) - Latest, high quality",
-            }
-            display_model = model_mapping.get(
-                current_model, "sakura-1.5b-v1.0 (3GB VRAM) - Latest, compact"
-            )
+            display_model = self._get_display_name_for_model(current_model)
             self.sakura_model_var.set(display_model)
 
             self.sakura_device_var.set(sakura_config.get("device", "auto"))
@@ -683,12 +729,12 @@ class SettingsDialog:
             )
             self.output_dir_var.set(output_config.get("output_directory", "outputs"))
             self.temp_dir_var.set(output_config.get("temp_directory", "temp"))
-            
+
             # Dual language settings
             self.generate_both_var.set(output_config.get("generate_both_languages", True))
             self.original_suffix_var.set(output_config.get("original_language_suffix", "_ja"))
             self.translated_suffix_var.set(output_config.get("translated_language_suffix", "_zh"))
-            
+
             # Trigger toggle to show/hide suffix options
             self._on_dual_language_toggle()
 
@@ -727,13 +773,9 @@ class SettingsDialog:
             is_sakura_method = self.translation_method_var.get() == "sakura"
             self.config.set("sakura.enabled", is_sakura_method)
 
-            # Map display text back to model name
-            display_to_model = {
-                "sakura-1.5b-v1.0 (3GB VRAM) - Latest, compact": "sakura-1.5b-v1.0",
-                "sakura-14b-v1.0 (16GB VRAM) - Latest, high quality": "sakura-14b-v1.0",
-            }
+            # Map display text back to model name dynamically
             selected_display = self.sakura_model_var.get()
-            model_key = display_to_model.get(selected_display, "sakura-1.5b-v1.0")
+            model_key = self._get_model_key_from_display(selected_display)
 
             # Set the model using the config's helper method
             if is_sakura_method:
@@ -754,7 +796,7 @@ class SettingsDialog:
             )
             self.config.set("output.output_directory", self.output_dir_var.get())
             self.config.set("output.temp_directory", self.temp_dir_var.get())
-            
+
             # Dual language settings
             self.config.set("output.generate_both_languages", self.generate_both_var.get())
             self.config.set("output.original_language_suffix", self.original_suffix_var.get())

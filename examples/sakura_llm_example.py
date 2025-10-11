@@ -12,7 +12,7 @@ import sys
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.translation.pytorch_translator import PyTorchTranslator
+from src.translation.sakura_translator_llama_cpp import SakuraTranslator
 
 from src.utils.logger import setup_logger
 
@@ -36,17 +36,13 @@ def main():
     print("=" * 50)
 
     try:
-        # Initialize SakuraLLM translator
+        # Initialize SakuraLLM translator with llama-cpp-python
         print("Initializing SakuraLLM translator...")
-        translator = PyTorchTranslator(
-            model_name="SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
-            source_lang="ja",
-            target_lang="zh",
-            device="auto",  # Auto-detect GPU
-            torch_dtype="float16",
-            force_gpu=True,
-            batch_size=4
-        )
+        from src.utils.config import Config
+        config = Config()
+        config.set("sakura.enabled", True)
+        
+        translator = SakuraTranslator.create_from_config(config)
 
         # Load model
         print("Loading model (this may take a few minutes for first download)...")
@@ -95,13 +91,13 @@ def compare_backends():
     test_text = "彼女は美しい桜の花を見ています。"
 
     try:
-        # SakuraLLM translation
+        # SakuraLLM translation with llama-cpp-python
         print("🌸 SakuraLLM Translation:")
-        sakura = PyTorchTranslator(
-            model_name="SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
-            source_lang="ja", target_lang="zh",
-            device="auto", force_gpu=True
-        )
+        from src.utils.config import Config
+        config = Config()
+        config.set("sakura.enabled", True)
+        
+        sakura = SakuraTranslator.create_from_config(config)
 
         if sakura.load_model():
             result_sakura = sakura.translate_text(test_text)

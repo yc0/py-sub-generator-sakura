@@ -38,9 +38,9 @@ class Config:
         },
         "sakura": {
             # SakuraLLM configuration for high-quality Japanese translation
-            "enabled": False,  # Enable SakuraLLM for advanced translation
-            "model_name": "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",  # Default Sakura model
-            "model_file": "sakura-1.5b-qwen2.5-v1.0-q4_k_m.gguf",  # Specific GGUF file
+            "enabled": True,  # Enable SakuraLLM for advanced translation
+            "model_name": "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF",  # Default Sakura model
+            "model_file": "sakura-14b-qwen2.5-v1.0-iq4xs.gguf",  # Specific GGUF file
             "device": "auto",  # auto, cpu, cuda, mps
             "context_length": 8192,  # Context window size
             "max_new_tokens": 512,  # Maximum tokens to generate
@@ -53,17 +53,17 @@ class Config:
             "use_chat_template": True,  # Use chat template for better results
             # Available SakuraLLM models (latest versions only)
             "available_models": {
-                "sakura-1.5b-v1.0": {
-                    "model_name": "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
-                    "model_file": "sakura-1.5b-qwen2.5-v1.0-q4_k_m.gguf",
-                    "description": "Latest compact 1.5B parameter model (3GB VRAM)",
-                    "vram_required": "3GB",
+                "sakura-7b-v1.0": {
+                    "model_name": "SakuraLLM/Sakura-7B-Qwen2.5-v1.0-GGUF",
+                    "model_file": "sakura-7b-qwen2.5-v1.0-iq4xs.gguf",
+                    "description": "Balanced 7B parameter model (IQ4_XS quantized) - Recommended",
+                    "vram_required": "8GB",
                     "release_date": "20241012",
                 },
                 "sakura-14b-v1.0": {
                     "model_name": "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF",
-                    "model_file": "sakura-14b-qwen2.5-v1.0-q4_k_m.gguf",
-                    "description": "Latest large 14B parameter model (16GB VRAM)",
+                    "model_file": "sakura-14b-qwen2.5-v1.0-iq4xs.gguf",
+                    "description": "High-quality 14B parameter model (IQ4_XS quantized) - Best Quality",
                     "vram_required": "16GB",
                     "release_date": "20241008",
                 },

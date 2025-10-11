@@ -33,20 +33,20 @@ dependencies = [
     "torch>=2.0.0",
     "transformers>=4.30.0",
     "datasets>=2.0.0",
-    
     # Audio processing
     "librosa>=0.10.0",
     "ffmpeg-python>=0.2.0",
-    
     # ASR and NLP
     "accelerate>=0.20.0",
     "sentencepiece>=0.1.99",
     "sacremoses>=0.0.53",
-    
     # Utilities
     "numpy>=1.21.0",
     "tqdm>=4.65.0",
-    
+    # Chinese text processing
+    "opencc-python-reimplemented>=0.1.7",
+    # SakuraLLM GGUF support
+    "llama-cpp-python>=0.2.0",
     # Optional optimizations
     "optimum[onnxruntime]>=1.8.0",
 ]

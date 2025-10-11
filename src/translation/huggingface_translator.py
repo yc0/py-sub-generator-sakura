@@ -5,7 +5,7 @@ from typing import Callable, Dict, List, Optional
 
 from ..models.subtitle_data import TranslationResult
 from ..utils.logger import LoggerMixin
-from .interface.base_translator import BaseTranslator
+from .base_translator import BaseTranslator
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,43 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
         self.max_length = max_length
         self.pipeline_kwargs = kwargs
 
+        # Check if this is an NLLB model
+        self.is_nllb = "nllb" in model_name.lower()
+
+        # Map standard language codes to NLLB codes if needed
+        if self.is_nllb:
+            self.nllb_source_lang = self._get_nllb_lang_code(source_lang, is_source=True)
+            self.nllb_target_lang = self._get_nllb_lang_code(target_lang, is_source=False)
+            self.logger.info(f"NLLB detected: {source_lang}({self.nllb_source_lang}) -> {target_lang}({self.nllb_target_lang})")
+
         # Pipeline will be created in load_model
         self.pipeline = None
+
+    def _get_nllb_lang_code(self, lang_code: str, is_source: bool = True) -> str:
+        """Map standard language codes to NLLB language codes.
+        
+        Args:
+            lang_code: Standard language code (e.g., 'en', 'ja', 'zh')
+            is_source: Whether this is for source language
+            
+        Returns:
+            NLLB language code
+        """
+        # NLLB language code mapping
+        nllb_codes = {
+            'en': 'eng_Latn',
+            'ja': 'jpn_Jpan',
+            'zh': 'zho_Hant',  # Default to Traditional Chinese
+            'zh-Hans': 'zho_Hans',  # Simplified Chinese
+            'zh-Hant': 'zho_Hant',  # Traditional Chinese
+        }
+
+        # Check for Traditional Chinese preference in config
+        if lang_code == 'zh' and hasattr(self, '_config'):
+            zh_variant = getattr(self._config, 'get_translation_config', lambda: {})().get('zh_target_variant', 'zho_Hant')
+            return zh_variant
+
+        return nllb_codes.get(lang_code, lang_code)
 
     def load_model(self) -> bool:
         """Load translation model using transformers pipeline.
@@ -139,7 +174,10 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 progress_callback(0.2)
 
             # Translate
-            result = self.pipeline(processed_text)
+            if self.is_nllb:
+                result = self.pipeline(processed_text, src_lang=self.nllb_source_lang, tgt_lang=self.nllb_target_lang)
+            else:
+                result = self.pipeline(processed_text)
 
             if progress_callback:
                 progress_callback(0.8)
@@ -227,7 +265,10 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
 
                 # Translate non-empty texts
                 if non_empty_texts:
-                    batch_results = self.pipeline(non_empty_texts)
+                    if self.is_nllb:
+                        batch_results = self.pipeline(non_empty_texts, src_lang=self.nllb_source_lang, tgt_lang=self.nllb_target_lang)
+                    else:
+                        batch_results = self.pipeline(non_empty_texts)
 
                     # Ensure batch_results is a list
                     if not isinstance(batch_results, list):
@@ -294,13 +335,28 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 for text in texts
             ]
 
+    def _preprocess_text(self, text: str) -> str:
+        """Preprocess text before translation."""
+        # Remove extra whitespace
+        text = ' '.join(text.split())
+        return text.strip()
+
+    def _postprocess_text(self, text: str) -> str:
+        """Postprocess text after translation."""
+        # Clean up translation output
+        text = text.strip()
+        # Remove any translation artifacts
+        if text.startswith('[') and text.endswith(']'):
+            text = text[1:-1]
+        return text
+
     def unload_model(self):
         """Unload translation model and free memory."""
         if self.pipeline is not None:
             del self.pipeline
             self.pipeline = None
 
-        super().unload_model()
+        self.is_loaded = False
 
         self.logger.info("Translation model unloaded")
 

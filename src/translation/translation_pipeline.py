@@ -4,11 +4,13 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from src.translation.sakura_translator_llama_cpp import SakuraTranslator
+from src.utils.chinese_converter import convert_to_traditional
+
 from ..models.subtitle_data import SubtitleFile, SubtitleSegment, TranslationResult
 from ..utils.config import Config
 from ..utils.logger import LoggerMixin
 from .huggingface_translator import MultiStageTranslator
-from .sakura_translator import SakuraTranslator
 
 logger = logging.getLogger(__name__)
 
@@ -123,30 +125,58 @@ class TranslationPipeline(LoggerMixin):
                 progress_callback("translation", 0.0)
 
             if self.sakura_translator:
-                # Use SakuraLLM for direct Japanese→Chinese translation
-                self.logger.info("🌸 Using SakuraLLM for Japanese→Chinese translation")
+                # Use enhanced SakuraLLM pipeline: ja → zh-Hans → zh-Hant
+                self.logger.info("🌸 Using SakuraLLM pipeline: ja → zh-Hans → zh-Hant")
+                translation_results = {}
 
-                # SakuraLLM only does Japanese→Chinese, so filter target languages
+                # Step 1: Japanese → Simplified Chinese (SakuraLLM)
                 if "zh" in target_languages:
-                    zh_results = self.sakura_translator.translate_batch(
+                    self.logger.info("Step 1: Japanese → Simplified Chinese (SakuraLLM)")
+                    zh_hans_results = self.sakura_translator.translate_batch(
                         texts,
                         progress_callback=lambda p: (
-                            progress_callback("translation", p)
+                            progress_callback("translation", p * 0.7)  # 70% for SakuraLLM
                             if progress_callback
                             else None
                         ),
                     )
-                    translation_results = {"zh": zh_results}
 
-                    # If English is also requested, we need to use standard translator for that
-                    if "en" in target_languages:
-                        self.logger.info(
-                            "Japanese→English requires standard translator alongside SakuraLLM"
+                    # Step 2: Simplified Chinese → Traditional Chinese (Character conversion)
+                    self.logger.info("Step 2: Simplified Chinese → Traditional Chinese (OpenCC character conversion)")
+
+                    zh_hant_results = []
+                    for i, result in enumerate(zh_hans_results):
+                        # Convert simplified to traditional using reliable OpenCC
+                        traditional_text = convert_to_traditional(result.translated_text)
+
+                        # Create new result with traditional text
+                        zh_hant_result = TranslationResult(
+                            original_text=result.original_text,
+                            translated_text=traditional_text,
+                            source_lang=result.source_lang,
+                            target_lang="zh-Hant",  # Mark as Traditional Chinese
+                            confidence=result.confidence,
                         )
-                        # We could initialize a single-stage translator here if needed
-                        translation_results["en"] = (
-                            []
-                        )  # For now, skip English when using SakuraLLM
+                        zh_hant_results.append(zh_hant_result)
+
+                        if progress_callback:
+                            progress_callback("conversion", 0.7 + (i + 1) / len(zh_hans_results) * 0.3)
+
+                    translation_results["zh"] = zh_hant_results
+                    self.logger.info(f"✅ SakuraLLM pipeline completed: {len(zh_hant_results)} translations")
+
+                # Handle English translation if requested
+                if "en" in target_languages:
+                    self.logger.info("Japanese→English: Using standard translator alongside SakuraLLM")
+                    if self.multi_stage_translator and self.multi_stage_translator.load_models():
+                        en_results = self.multi_stage_translator.translate_to_language(texts, "en")
+                        translation_results["en"] = en_results
+                    else:
+                        self.logger.warning("Standard translator not available for English translation")
+                        translation_results["en"] = []
+
+                if not translation_results:
+                    self.logger.warning("No target languages supported by SakuraLLM pipeline")
                 else:
                     self.logger.warning(
                         "SakuraLLM only supports Japanese→Chinese. Skipping other languages."
@@ -287,13 +317,13 @@ class TranslationPipeline(LoggerMixin):
                     for fmt in formats:
                         if fmt == "srt":
                             translated_content = subtitle_file.export_srt(lang_code)
-                            
+
                             # Use custom suffix if generating both, otherwise use language code
                             if generate_both and lang_code in ["zh", "zh-cn", "zh-tw"]:
                                 suffix = translated_suffix
                             else:
                                 suffix = f"_{lang_code}"
-                            
+
                             translated_file = output_dir / f"{base_name}{suffix}.srt"
 
                             with open(translated_file, "w", encoding="utf-8") as f:
@@ -370,7 +400,7 @@ class TranslationPipeline(LoggerMixin):
         """
         return self.sakura_translator is not None and self.config.is_sakura_enabled()
 
-    def get_supported_languages(self) -> Dict[str, List[str]]:
+    def get_supported_language_pairs(self) -> Dict[str, List[str]]:
         """Get supported language pairs for the active translator.
 
         Returns:

@@ -48,7 +48,7 @@ class MainWindow(LoggerMixin):
         ui_config = self.config.get_ui_config()
 
         self.root.title(ui_config.get("window_title", "Sakura Subtitle Generator"))
-        self.root.geometry(ui_config.get("window_size", "800x600"))
+        self.root.geometry(ui_config.get("window_size", "1400x900"))
         self.root.minsize(600, 400)
 
         # Center window on screen
@@ -59,7 +59,7 @@ class MainWindow(LoggerMixin):
 
         # Configure style
         self.style = ttk.Style()
-        self.style.theme_use(ui_config.get("theme", "default"))
+        self.style.theme_use(ui_config.get("theme", "alt"))
 
     def apply_ui_settings(self):
         """Apply UI settings from current configuration."""
@@ -74,7 +74,7 @@ class MainWindow(LoggerMixin):
 
             # Update theme if changed
             current_theme = self.style.theme_use()
-            new_theme = ui_config.get("theme", "default")
+            new_theme = ui_config.get("theme", "alt")
             if current_theme != new_theme:
                 try:
                     self.style.theme_use(new_theme)
