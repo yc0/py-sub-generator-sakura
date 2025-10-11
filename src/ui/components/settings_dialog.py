@@ -222,6 +222,18 @@ class SettingsDialog:
         )
         chunk_spin.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         
+        # Native Whisper info
+        info_frame = ttk.Frame(frame)
+        info_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(15, 5))
+        
+        info_label = ttk.Label(
+            info_frame, 
+            text="ℹ️  Using Whisper's native generate() method - no experimental warnings, no token limits!",
+            foreground="green",
+            font=("TkDefaultFont", 8)
+        )
+        info_label.grid(row=0, column=0, sticky=tk.W)
+        
         # Configure column weights
         frame.columnconfigure(1, weight=1)
     

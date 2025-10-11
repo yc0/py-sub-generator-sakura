@@ -5,29 +5,19 @@
     "batch_size": 1,
     "language": "ja",
     "return_timestamps": true,
-    "chunk_length": 30,
-    "overlap": 1.0,
-    "stride_length_s": 1.0,
-    "max_new_tokens": 128,
-    "ignore_warning": true,
-    "generate_kwargs": {
-      "return_timestamps": true,
-      "num_beams": 1,
-      "do_sample": false,
-      "forced_decoder_ids": null
-    }
+    "chunk_length": 30
   },
   "translation": {
     "ja_to_en_model": "Helsinki-NLP/opus-mt-ja-en",
-    "en_to_zh_model": "Helsinki-NLP/opus-mt-en-zh", 
+    "en_to_zh_model": "Helsinki-NLP/opus-mt-en-zh",
     "device": "auto",
     "batch_size": 8,
     "max_length": 512
   },
   "sakura": {
-    "enabled": false,
-    "model_name": "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
-    "model_file": "sakura-1.5b-qwen2.5-v1.0-q4_k_m.gguf",
+    "enabled": true,
+    "model_name": "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF",
+    "model_file": "sakura-14b-qwen2.5-v1.0-q4_k_m.gguf",
     "device": "auto",
     "context_length": 8192,
     "max_new_tokens": 512,
@@ -57,8 +47,8 @@
   },
   "ui": {
     "window_title": "Sakura Subtitle Generator",
-    "window_size": "800x600",
-    "theme": "default",
+    "window_size": "1400x900",
+    "theme": "alt",
     "progress_update_interval": 100
   },
   "output": {

@@ -28,8 +28,7 @@ class Config:
             "batch_size": 1,
             "language": "ja",  # Japanese
             "return_timestamps": True,
-            "chunk_length": 30,  # seconds
-            "overlap": 1.0  # seconds
+            "chunk_length": 30  # seconds (native Whisper optimal window)
         },
         "translation": {
             "ja_to_en_model": "Helsinki-NLP/opus-mt-ja-en",
