@@ -6,10 +6,9 @@ This script sets up the project with optimizations specifically for Apple Silico
 It includes Metal Performance Shaders (MPS) support for PyTorch acceleration.
 """
 
-import os
-import sys
-import subprocess
 import platform
+import subprocess
+import sys
 
 
 def check_apple_silicon():
@@ -20,9 +19,9 @@ def check_apple_silicon():
 def check_ffmpeg():
     """Check if FFmpeg is installed."""
     try:
-        subprocess.run(['ffmpeg', '-version'], 
-                      stdout=subprocess.DEVNULL, 
-                      stderr=subprocess.DEVNULL, 
+        subprocess.run(['ffmpeg', '-version'],
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL,
                       check=True)
         print("✓ FFmpeg is available")
         return True
@@ -33,7 +32,7 @@ def check_ffmpeg():
 def install_ffmpeg_macos():
     """Install FFmpeg on macOS using Homebrew."""
     print("Installing FFmpeg for audio extraction...")
-    
+
     try:
         # Try Homebrew first
         subprocess.run(["brew", "--version"], check=True, capture_output=True)
@@ -60,7 +59,7 @@ def check_uv():
 def install_uv():
     """Install uv package manager."""
     print("Installing uv (ultra-fast Python package installer)...")
-    
+
     # Install uv using the official installer
     try:
         if platform.system() == "Darwin":  # macOS
@@ -71,45 +70,45 @@ def install_uv():
             except (subprocess.CalledProcessError, FileNotFoundError):
                 # Fallback to curl installer
                 subprocess.run([
-                    "curl", "-LsSf", 
+                    "curl", "-LsSf",
                     "https://astral.sh/uv/install.sh",
                     "|", "sh"
                 ], shell=True, check=True)
                 print("✓ uv installed via curl installer")
         else:
             subprocess.run([
-                "curl", "-LsSf", 
+                "curl", "-LsSf",
                 "https://astral.sh/uv/install.sh",
                 "|", "sh"
             ], shell=True, check=True)
             print("✓ uv installed")
-            
+
     except subprocess.CalledProcessError:
         print("❌ Failed to install uv. Please install manually:")
         print("   Visit: https://docs.astral.sh/uv/getting-started/installation/")
         return False
-    
+
     return True
 
 
 def setup_python_environment():
     """Set up Python environment with uv."""
     print("Setting up Python environment with uv...")
-    
+
     try:
         # Create virtual environment
         subprocess.run(["uv", "venv"], check=True)
         print("✓ Virtual environment created")
-        
+
         # Install Apple Silicon optimized dependencies
         print("Installing Apple Silicon optimized dependencies...")
         subprocess.run([
             "uv", "pip", "install", "-e", ".[apple-silicon]"
         ], check=True)
         print("✓ Dependencies installed")
-        
+
         return True
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Failed to set up environment: {e}")
         return False
@@ -118,36 +117,36 @@ def setup_python_environment():
 def verify_installation():
     """Verify the installation works correctly."""
     print("Verifying installation...")
-    
+
     try:
         # Test FFmpeg availability
         result = subprocess.run([
             "ffmpeg", "-version"
         ], capture_output=True, text=True, check=True)
-        
+
         # Extract version from first line
         version_line = result.stdout.split('\n')[0]
         print(f"✓ FFmpeg verification: {version_line}")
-        
+
         # Test PyTorch MPS availability
         result = subprocess.run([
             "uv", "run", "python", "-c",
             "import torch; print('PyTorch version:', torch.__version__); "
             "print('MPS available:', torch.backends.mps.is_available() if hasattr(torch.backends, 'mps') else False)"
         ], capture_output=True, text=True, check=True)
-        
+
         print("✓ PyTorch verification:")
         print(result.stdout)
-        
+
         # Test transformers
         subprocess.run([
             "uv", "run", "python", "-c",
             "from transformers import pipeline; print('✓ Transformers working')"
         ], check=True, capture_output=True)
-        
+
         print("✓ All components verified successfully!")
         return True
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Verification failed: {e}")
         if e.stdout:
@@ -196,7 +195,7 @@ def main():
     """Main setup function."""
     print("🚀 Apple Silicon Setup for Japanese Subtitle Generator")
     print("=" * 60)
-    
+
     # Check if running on Apple Silicon
     if not check_apple_silicon():
         print("⚠️  Warning: This script is optimized for Apple Silicon Macs.")
@@ -206,7 +205,7 @@ def main():
             sys.exit(0)
     else:
         print("✓ Apple Silicon detected (ARM64 macOS)")
-    
+
     # Check FFmpeg installation
     if not check_ffmpeg():
         print("❌ FFmpeg not found - required for audio extraction")
@@ -219,7 +218,7 @@ def main():
             print("❌ FFmpeg is required. Please install it manually:")
             print("   brew install ffmpeg")
             sys.exit(1)
-    
+
     # Check/install uv
     if not check_uv():
         print("uv not found. Installing...")
@@ -227,17 +226,17 @@ def main():
             sys.exit(1)
     else:
         print("✓ uv is available")
-    
+
     # Setup environment
     if not setup_python_environment():
         print("❌ Setup failed. Please check the errors above.")
         sys.exit(1)
-    
+
     # Verify installation
     if not verify_installation():
         print("⚠️  Installation completed but verification failed.")
         print("   You may still be able to use the application.")
-    
+
     print_usage_instructions()
 
 

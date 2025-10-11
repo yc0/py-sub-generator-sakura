@@ -74,7 +74,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 "device_map": None,  # Explicitly disable auto device mapping
                 "low_cpu_mem_usage": False,  # Disable to avoid meta tensor issues
             }
-            
+
             self.pipeline = pipeline(
                 "translation",
                 model=self.model_name,

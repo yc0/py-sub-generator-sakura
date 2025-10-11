@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Installation script for Sakura Subtitle Generator."""
 
-import sys
-import subprocess
 import platform
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -20,17 +20,17 @@ def check_python_version():
 def check_ffmpeg():
     """Check if FFmpeg is installed."""
     try:
-        result = subprocess.run(['ffmpeg', '-version'], 
+        result = subprocess.run(['ffmpeg', '-version'],
                               capture_output=True, text=True)
         if result.returncode == 0:
             print("✅ FFmpeg found")
             return True
     except FileNotFoundError:
         pass
-    
+
     print("⚠️  FFmpeg not found - required for audio extraction")
     print("Please install FFmpeg:")
-    
+
     system = platform.system().lower()
     if system == "darwin":  # macOS
         print("  brew install ffmpeg")
@@ -39,7 +39,7 @@ def check_ffmpeg():
         print("  sudo yum install ffmpeg  # RHEL/CentOS")
     elif system == "windows":
         print("  Download from: https://ffmpeg.org/download.html")
-    
+
     return False
 
 
@@ -55,10 +55,10 @@ def check_uv():
 def install_dependencies():
     """Install Python dependencies using uv or pip."""
     print("📦 Installing Python dependencies...")
-    
+
     # Check if uv is available
     use_uv = check_uv()
-    
+
     try:
         if use_uv:
             print("🚀 Using uv for fast installation...")
@@ -76,9 +76,9 @@ def install_dependencies():
             # Install project in editable mode with pip
             subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-e', '.'])
             print("✅ Dependencies installed with pip")
-        
+
         print("✅ Dependencies installed successfully")
-        
+
         # Check for GPU support and offer additional packages
         try:
             import torch
@@ -100,9 +100,9 @@ def install_dependencies():
                     print("✅ Apple Silicon optimized packages installed")
         except ImportError:
             pass
-        
+
         return True
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Failed to install dependencies: {e}")
         return False
@@ -111,7 +111,7 @@ def install_dependencies():
 def create_directories():
     """Create necessary directories."""
     dirs = ["outputs", "temp", "logs"]
-    
+
     for dir_name in dirs:
         dir_path = Path(dir_name)
         dir_path.mkdir(exist_ok=True)
@@ -134,14 +134,14 @@ def main():
     """Main setup function."""
     print("🌸 Sakura Subtitle Generator - Installation")
     print("=" * 42)
-    
+
     # Check for Apple Silicon and suggest optimized setup
     check_apple_silicon()
-    
+
     # Check system requirements
     check_python_version()
     ffmpeg_ok = check_ffmpeg()
-    
+
     # Check if uv is available
     has_uv = check_uv()
     if has_uv:
@@ -151,19 +151,19 @@ def main():
         print("   curl -LsSf https://astral.sh/uv/install.sh | sh")
         print("   # or")
         print("   pip install uv")
-    
+
     # Install dependencies
     if not install_dependencies():
         sys.exit(1)
-    
+
     # Create directories
     create_directories()
-    
+
     print("\n🎉 Installation completed!")
-    
+
     if not ffmpeg_ok:
         print("\n⚠️  Please install FFmpeg before running the application")
-    
+
     if has_uv:
         print("\n🚀 Recommended way to run (isolated environment):")
         print("   uv run python main.py")
@@ -173,7 +173,7 @@ def main():
     else:
         print("\n🚀 To start the application, run:")
         print("   python main.py")
-    
+
     print("\n📖 For more information, see README.md")
 
 

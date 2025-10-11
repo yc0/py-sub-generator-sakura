@@ -5,27 +5,26 @@
 Professional test execution with different test categories and reporting.
 """
 
-import sys
-import subprocess
-from pathlib import Path
 import argparse
+import subprocess
+import sys
 
 
 def run_tests(test_type="all", verbose=False, coverage=False, gpu=False):
     """Run tests with specified configuration."""
-    
+
     cmd = ["uv", "run", "pytest"]
-    
+
     # Add verbosity
     if verbose:
         cmd.append("-v")
     else:
         cmd.append("-q")
-    
+
     # Add coverage if requested
     if coverage:
         cmd.extend(["--cov=src", "--cov-report=term-missing", "--cov-report=html"])
-    
+
     # Select test types
     if test_type == "unit":
         cmd.extend(["-m", "unit"])
@@ -39,17 +38,17 @@ def run_tests(test_type="all", verbose=False, coverage=False, gpu=False):
         cmd.extend(["-m", "integration"])
     elif test_type == "no-download":
         cmd.extend(["-m", "not model_download"])
-    
+
     # GPU-specific handling
     if not gpu:
         cmd.extend(["-m", "not gpu"])
-    
+
     # Add test directory
     cmd.append("tests/")
-    
+
     print(f"🧪 Running tests: {' '.join(cmd)}")
     print("=" * 60)
-    
+
     try:
         result = subprocess.run(cmd, check=False)
         return result.returncode
@@ -63,7 +62,7 @@ def run_tests(test_type="all", verbose=False, coverage=False, gpu=False):
 
 def main():
     """Main test runner."""
-    
+
     parser = argparse.ArgumentParser(
         description="Run Sakura Subtitle Generator tests",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -85,34 +84,34 @@ Examples:
   python run_tests.py --type slow -v     # Run slow tests (may download models)
         """
     )
-    
+
     parser.add_argument(
         "--type", "-t",
         choices=["all", "unit", "gpu", "slow", "fast", "integration", "no-download"],
         default="fast",
         help="Type of tests to run (default: fast)"
     )
-    
+
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Verbose output"
     )
-    
+
     parser.add_argument(
         "--coverage", "-c",
-        action="store_true", 
+        action="store_true",
         help="Generate coverage report"
     )
-    
+
     parser.add_argument(
         "--gpu", "-g",
         action="store_true",
         help="Include GPU tests (requires GPU acceleration)"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Show configuration
     print("🌸 Sakura Subtitle Generator Test Suite")
     print("=" * 60)
@@ -121,10 +120,10 @@ Examples:
     print(f"Coverage: {args.coverage}")
     print(f"GPU tests: {args.gpu}")
     print()
-    
+
     # Check if pytest is available
     try:
-        result = subprocess.run(["uv", "run", "pytest", "--version"], 
+        result = subprocess.run(["uv", "run", "pytest", "--version"],
                               capture_output=True, text=True)
         if result.returncode != 0:
             print("❌ pytest not available. Installing...")
@@ -132,21 +131,21 @@ Examples:
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("❌ Error setting up test environment")
         return 1
-    
+
     # Run tests
     exit_code = run_tests(
         test_type=args.type,
-        verbose=args.verbose, 
+        verbose=args.verbose,
         coverage=args.coverage,
         gpu=args.gpu
     )
-    
+
     # Report results
     if exit_code == 0:
         print("\n✅ All tests passed!")
     else:
         print(f"\n❌ Tests failed with exit code: {exit_code}")
-    
+
     return exit_code
 
 

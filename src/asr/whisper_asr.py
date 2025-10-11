@@ -716,7 +716,7 @@ class WhisperASR(BaseASR, LoggerMixin):
         if hasattr(self, 'model') and self.model is not None:
             del self.model
             self.model = None
-        
+
         if hasattr(self, 'processor') and self.processor is not None:
             del self.processor
             self.processor = None
