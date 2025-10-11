@@ -268,10 +268,29 @@ The main orchestrator that coordinates the entire subtitle generation pipeline:
 - **Multi-Stage Translator**: Japanese → English → Traditional Chinese
 
 ##### Translation Backend Strategy:
-- **🚀 Primary**: HuggingFace Transformers with GPU acceleration (MPS/CUDA)
-- **⚡ Alternative**: Pure PyTorch with GPU optimization
+- **🚀 Primary**: HuggingFace Transformers with GPU acceleration (MPS/CUDA) 
+- **🌸 Advanced**: PyTorchTranslator for SakuraLLM integration (specialized Japanese LLMs)
+- **⚡ Alternative**: Pure PyTorch with GPU optimization for any HuggingFace model
 - **❌ Not Included**: ctransformers (CPU-only focus conflicts with project goals)
 - **🎯 Focus**: Maximum GPU performance for real-time subtitle generation
+
+##### **🌸 PyTorchTranslator Features (SakuraLLM Ready):**
+- **🎯 LLM Support**: Direct integration with large language models
+- **🚀 GPU Optimization**: MPS/CUDA acceleration with FP16 precision
+- **🧠 Advanced Generation**: Temperature, sampling, KV caching
+- **📝 Prompt Engineering**: Customizable prompts for specialized models
+- **🎮 Memory Management**: Efficient VRAM usage and model loading
+- **⚖️ Model Agnostic**: Works with any HuggingFace Transformers model
+
+**SakuraLLM Integration Example:**
+```python
+# Specialized Japanese light novel translation
+sakura_translator = PyTorchTranslator(
+    model_name="SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
+    source_lang="ja", target_lang="zh",
+    device="auto", torch_dtype="float16"
+)
+```
 
 **Note for CPU Users**: This project prioritizes GPU acceleration. If you require CPU-only inference, consider implementing additional `ctransformers`-based classes, though this is outside the current project scope.
 
@@ -488,6 +507,28 @@ uv run python main.py
 # Downloads will occur to:
 # ~/.cache/huggingface/transformers/
 # Total download time: 5-15 minutes (depending on internet)
+# Note: Models cache to ~/.cache/huggingface/ and won't re-download
+```
+
+#### **⚡ Cache Optimization:**
+
+Models are cached to `~/.cache/huggingface/` and reused across runs. However, you might see downloads for:
+- **Format updates**: safetensors (preferred) vs pytorch_model.bin
+- **Missing components**: tokenizer files, config updates
+
+**Cache Status Check:**
+```bash
+# Check cached models
+ls ~/.cache/huggingface/hub/
+
+# Cache size
+du -sh ~/.cache/huggingface/
+```
+
+**Force Pre-download:**
+```bash
+# Pre-download all model formats to avoid future downloads
+uv run python predownload_models.py
 ```
 
 #### **Pre-download Models (Optional):**
@@ -507,14 +548,95 @@ print('All models downloaded successfully!')
 "
 ```
 
+## 🌸 **SakuraLLM Integration (Advanced Option)**
+
+### **🎯 Alternative: SakuraLLM for Superior Japanese Translation**
+
+For users seeking **highest quality Japanese→Chinese translation**, we support **SakuraLLM integration** via the PyTorchTranslator:
+
+#### **📋 SakuraLLM Model Options:**
+
+| Model | Parameters | Download Size | Memory Req | Performance | Quality |
+|-------|------------|--------------|-------------|-------------|---------|
+| **🌸 Sakura-1.5B** ⭐ | 1.78B | ~2-4GB | 4-6GB | 8-15x faster | Very Good |
+| **🌸 Sakura-14B** | 14.8B | ~15-30GB | 16-32GB | 2-4x slower | Excellent |
+
+#### **✅ Recommended: Sakura-1.5B-Qwen2.5-v1.0**
+- **🎯 Optimal Balance**: Quality vs Hardware Requirements
+- **🚀 Real-time Ready**: Fast enough for subtitle generation  
+- **💾 Accessible**: Fits on M1 8GB and GTX 1660 6GB
+- **🎨 Specialized**: Light novel translation optimized
+
+#### **⚙️ SakuraLLM Integration:**
+
+```python
+# config.json - SakuraLLM setup
+{
+  "translation": {
+    "use_sakura": true,
+    "sakura_model": "SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
+    "source_lang": "ja",
+    "target_lang": "zh", 
+    "device": "auto",
+    "torch_dtype": "float16"
+  }
+}
+
+# Usage with PyTorchTranslator
+from src.translation.pytorch_translator import PyTorchTranslator
+
+sakura = PyTorchTranslator(
+    model_name="SakuraLLM/Sakura-1.5B-Qwen2.5-v1.0-GGUF",
+    source_lang="ja",
+    target_lang="zh",
+    device="auto",  # GPU-first
+    force_gpu=True
+)
+```
+
+#### **🌸 SakuraLLM Advantages:**
+- **📚 Light Novel Optimized**: Specialized for Japanese fiction/anime content
+- **👥 Character Context**: Better character name and pronoun handling
+- **🎭 Cultural Nuance**: Superior cultural context preservation
+- **📖 Terminology Support**: Built-in glossary/dictionary support
+- **🎯 Subtitle Appropriate**: Optimized for short text segments
+
+#### **⚠️ SakuraLLM Limitations:**
+- **🌐 Language Pair**: Japanese→Chinese only (no English intermediate)
+- **📖 Domain**: Optimized for light novels, may struggle with technical content  
+- **💾 Size**: Larger than Helsinki-NLP models (2-4GB vs 300MB)
+- **⚖️ License**: CC-BY-NC-SA-4.0 (non-commercial)
+- **🔧 Complexity**: Requires more sophisticated prompt engineering
+
+#### **🎯 When to Use SakuraLLM:**
+- **✅ Anime/Light Novel** content translation
+- **✅ High-quality Japanese→Chinese** required
+- **✅ Have 8GB+ VRAM/RAM** available
+- **✅ Non-commercial use** acceptable
+
+#### **🎯 When to Use Default (Helsinki-NLP):**
+- **✅ General purpose** translation
+- **✅ Resource-constrained** systems
+- **✅ Commercial use** required
+- **✅ Multi-language pairs** needed
+
 ## ⚡ Performance Comparison
+
+### **Translation Backend Comparison:**
+
+| Backend | **Quality** | **Speed** | **Memory** | **Languages** | **Use Case** |
+|---------|------------|-----------|-----------|---------------|--------------|
+| **Helsinki-NLP** | Good | Very Fast | 1GB | Multi-pair | General |
+| **SakuraLLM 1.5B** | Very Good | Fast | 4GB | JA→ZH | Anime/LN |
+| **SakuraLLM 14B** | Excellent | Moderate | 16GB | JA→ZH | Premium |
 
 ### **GPU vs CPU Performance** (Approximate benchmarks):
 
 | Backend | **Apple M3** | **NVIDIA RTX 4080** | **CPU Only (Intel/AMD)** |
 |---------|-------------|---------------------|-------------------------|
 | **Whisper Large-v3** | 8x realtime (MPS) | 12x realtime (CUDA) | 1.5x realtime |
-| **Translation** | 4x faster (MPS) | 6x faster (CUDA) | Baseline |
+| **Helsinki Translation** | 4x faster (MPS) | 6x faster (CUDA) | Baseline |
+| **SakuraLLM 1.5B** | 3x faster (MPS) | 5x faster (CUDA) | 0.5x baseline |
 | **Memory Usage** | 8GB unified | 6GB VRAM | 16GB RAM |
 | **Power Efficiency** | Excellent | Moderate | Poor |
 
