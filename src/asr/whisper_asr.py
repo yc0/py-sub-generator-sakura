@@ -39,8 +39,32 @@ class WhisperASR(BaseASR, LoggerMixin):
         self.chunk_length_s = chunk_length_s
         self.pipeline_kwargs = kwargs
         
+        # Configure for better long-form transcription
+        self._configure_for_longform()
+        
         # Pipeline will be created in load_model
         self.pipeline = None
+    
+    def _configure_for_longform(self):
+        """Configure parameters for better long-form transcription."""
+        # Set reasonable defaults for long audio
+        if self.chunk_length_s is None or self.chunk_length_s <= 0:
+            self.chunk_length_s = 30  # Whisper's optimal chunk size
+            
+        # Add recommended parameters for better timestamp prediction
+        self.pipeline_kwargs.setdefault('stride_length_s', 1.0)  # Overlap between chunks
+        self.pipeline_kwargs.setdefault('max_new_tokens', 128)   # Prevent runaway generation
+        
+        # Ensure WhisperTimeStampLogitsProcessor configuration
+        if self.return_timestamps:
+            generate_kwargs = self.pipeline_kwargs.get('generate_kwargs', {})
+            generate_kwargs.update({
+                'return_timestamps': True,     # Critical for WhisperTimeStampLogitsProcessor
+                'num_beams': 1,               # Better timestamp accuracy
+                'do_sample': False,           # Deterministic generation
+                'forced_decoder_ids': None,   # Auto language detection
+            })
+            self.pipeline_kwargs['generate_kwargs'] = generate_kwargs
     
     def load_model(self) -> bool:
         """Load Whisper model using transformers pipeline.
@@ -57,15 +81,38 @@ class WhisperASR(BaseASR, LoggerMixin):
             # Determine torch_dtype based on device
             torch_dtype = torch.float16 if self.device == "cuda" else torch.float32
             
-            # Create pipeline
+            # Create pipeline with proper configuration for Whisper
+            # Note: For long-form audio, we suppress chunk_length_s warnings
+            pipeline_kwargs = self.pipeline_kwargs.copy()
+            
+            # Add ignore_warning to suppress experimental chunk_length_s warning
+            if self.chunk_length_s is not None and self.chunk_length_s > 0:
+                self.logger.info(f"Using chunk_length_s={self.chunk_length_s}s for long-form transcription")
+                self.logger.warning("chunk_length_s is experimental with Whisper. For production use, consider using Whisper's generate method directly.")
+                pipeline_kwargs['ignore_warning'] = True
+            
+            # Ensure proper timestamp generation with WhisperTimeStampLogitsProcessor
+            # These parameters help ensure the processor is used correctly
+            if self.return_timestamps:
+                self.logger.info("Configuring for timestamp generation with WhisperTimeStampLogitsProcessor")
+                # Force timestamp prediction by ensuring return_timestamps is properly set
+                pipeline_kwargs['return_timestamps'] = True
+                # Add generation config to ensure timestamp logits processing
+                generate_kwargs = pipeline_kwargs.get('generate_kwargs', {})
+                generate_kwargs.update({
+                    'return_timestamps': True,
+                    'forced_decoder_ids': None,  # Let Whisper decide language/task tokens
+                })
+                pipeline_kwargs['generate_kwargs'] = generate_kwargs
+            
             self.pipeline = pipeline(
                 "automatic-speech-recognition",
                 model=self.model_name,
                 device=0 if self.device == "cuda" else -1,
                 torch_dtype=torch_dtype,
                 return_timestamps=self.return_timestamps,
-                chunk_length_s=self.chunk_length_s,
-                **self.pipeline_kwargs
+                chunk_length_s=self.chunk_length_s if self.chunk_length_s and self.chunk_length_s > 0 else None,
+                **pipeline_kwargs
             )
             
             self.is_loaded = True
@@ -103,11 +150,20 @@ class WhisperASR(BaseASR, LoggerMixin):
             if progress_callback:
                 progress_callback(0.0)
             
-            # Prepare transcription parameters
+            # Prepare transcription parameters to ensure WhisperTimeStampLogitsProcessor is used
             generate_kwargs = {
                 "language": language,
-                "task": "transcribe"
+                "task": "transcribe",
+                "return_timestamps": True,  # Critical for timestamp logits processing
+                "forced_decoder_ids": None,  # Let Whisper auto-detect language/task
             }
+            
+            # Add additional parameters for better timestamp accuracy
+            if self.return_timestamps:
+                generate_kwargs.update({
+                    "num_beams": 1,  # Beam search can interfere with timestamp accuracy
+                    "do_sample": False,  # Deterministic generation for consistent timestamps
+                })
             
             # Run transcription
             result = self.pipeline(
@@ -199,10 +255,24 @@ class WhisperASR(BaseASR, LoggerMixin):
             # Handle different result formats
             if "chunks" in whisper_result:
                 # Chunked result with timestamps
-                for chunk in whisper_result["chunks"]:
+                for i, chunk in enumerate(whisper_result["chunks"]):
+                    timestamp = chunk.get("timestamp", [None, None])
+                    start_time = timestamp[0] if timestamp[0] is not None else 0.0
+                    end_time = timestamp[1] if timestamp[1] is not None else start_time + 1.0
+                    
+                    # Handle missing end timestamps (common Whisper issue)
+                    if end_time is None or end_time <= start_time:
+                        # Estimate end time based on text length and speech rate
+                        text_length = len(chunk["text"].strip())
+                        estimated_duration = max(text_length * 0.1, 1.0)  # ~10 chars per second
+                        end_time = start_time + estimated_duration
+                        
+                        if i == len(whisper_result["chunks"]) - 1:
+                            self.logger.warning("Whisper missing end timestamp for final segment - estimated duration used")
+                    
                     segment = SubtitleSegment(
-                        start_time=chunk["timestamp"][0] or 0.0,
-                        end_time=chunk["timestamp"][1] or 0.0,
+                        start_time=start_time,
+                        end_time=end_time,
                         text=chunk["text"].strip(),
                         confidence=None  # Whisper doesn't return confidence scores
                     )
@@ -297,3 +367,34 @@ class WhisperASR(BaseASR, LoggerMixin):
         super().unload_model()
         
         self.logger.info("Whisper model unloaded")
+    
+    @classmethod
+    def get_longform_recommendations(cls) -> Dict[str, Any]:
+        """Get recommended configuration for long-form transcription.
+        
+        Returns:
+            Dictionary with recommended settings
+        """
+        return {
+            "chunk_length_s": 30,          # Whisper's optimal chunk size
+            "stride_length_s": 1.0,        # Small overlap between chunks
+            "max_new_tokens": 128,         # Prevent runaway generation
+            "return_timestamps": True,     # Essential for subtitles and WhisperTimeStampLogitsProcessor
+            "ignore_warning": True,        # Suppress experimental warnings
+            "batch_size": 1,               # Conservative for memory
+            "generate_kwargs": {
+                "return_timestamps": True,  # Ensures WhisperTimeStampLogitsProcessor is used
+                "num_beams": 1,            # Better timestamp accuracy
+                "do_sample": False,        # Deterministic generation
+                "forced_decoder_ids": None  # Auto language detection
+            },
+            "notes": [
+                "return_timestamps=True ensures WhisperTimeStampLogitsProcessor is used during generation",
+                "WhisperTimeStampLogitsProcessor automatically handles timestamp prediction",
+                "For production use, consider using Whisper's generate() method directly",
+                "chunk_length_s is experimental but works well for most cases",
+                "Missing end timestamps are automatically estimated using text length heuristics",
+                "Use smaller chunks (15s) for better timestamp accuracy",
+                "Deterministic generation (do_sample=False) improves timestamp consistency"
+            ]
+        }
