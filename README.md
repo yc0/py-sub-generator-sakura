@@ -709,7 +709,8 @@ If you're limited to CPU-only inference:
 
 ### 📋 Project Documentation
 - **[Progress Summary](PROGRESS_SUMMARY.md)** - Complete overview of recent improvements and transformations
-- **[Technical Changelog](TECHNICAL_CHANGELOG.md)** - Detailed technical implementation documentation
+- **[Technical Changelog](TECHNICAL_CHANGELOG.md)** - Detailed technical implementation documentation  
+- **[UV Tool Strategy](docs/UV_TOOL_STRATEGY.md)** - Why we use `uv tool` for development tools instead of project dependencies
 
 ### 🚀 Recent Major Updates
 - **Native Whisper Implementation** - Refactored from pipeline to native `generate()` method
