@@ -39,19 +39,34 @@ A powerful, well-architected application for generating Japanese subtitles with 
 
 ### Installation
 
-#### Method 1: Universal Setup (Recommended)
+#### Method 1: Pure uv (Recommended - No Environment Pollution)
 ```bash
 git clone <repository-url>
 cd py-sub-generator-sakura
 
-python setup.py  # Auto-detects uv, handles all dependencies
+# No installation needed - runs in isolated environment!
+uv run python main.py
+```
+- 🔒 **Zero environment pollution** - Completely isolated
+- ⚡ **Fastest startup** - Auto-manages dependencies 
+- 🛡️ **Safe** - No system Python modification
+- 🧹 **Clean** - No installation artifacts
+
+#### Method 2: Universal Setup 
+```bash
+git clone <repository-url>
+cd py-sub-generator-sakura
+
+uv run python setup.py  # Use uv run to avoid polluting system Python!
+# OR (if you must):
+python setup.py  # ⚠️ May install to system Python if uv not available
 ```
 - ✅ **Works on all platforms** (Windows, Linux, macOS)
 - ✅ **Auto-detects uv** for faster installation
 - ✅ **Checks system requirements** (Python, FFmpeg)
-- ✅ **Falls back to pip** if uv unavailable
+- ⚠️ **Warning**: May pollute system Python if uv unavailable
 
-#### Method 2: Apple Silicon Optimized (M1/M2/M3 Macs)
+#### Method 3: Apple Silicon Optimized (M1/M2/M3 Macs)
 ```bash
 git clone <repository-url>
 cd py-sub-generator-sakura
@@ -63,45 +78,57 @@ python setup_apple_silicon.py      # Maximum performance setup
 - 🔧 **Automatic FFmpeg installation** via Homebrew
 - 💾 **20-30% less memory usage**
 
-#### Method 3: Manual Installation (Advanced Users)
+#### Method 4: Manual Installation (Advanced)
 ```bash
 git clone <repository-url>
 cd py-sub-generator-sakura
 
-# Using uv (faster)
+# Install with uv (automatically handles dependencies)
 uv pip install -e .                    # Basic installation
 uv pip install -e ".[gpu]"            # With GPU support  
 uv pip install -e ".[apple-silicon]"  # Apple Silicon optimized
-uv pip install -e ".[dev,test]"       # Development setup
+uv pip install -e ".[dev]"            # Development dependencies
 
-# Using pip (traditional)
+# Or install development dependencies separately
+uv pip install -e . --group dev
+```
+
+#### Method 5: Traditional pip Installation (⚠️ Not Recommended)
+```bash
+git clone <repository-url>
+cd py-sub-generator-sakura
+
 pip install -e .                      # Basic installation
 pip install -e ".[gpu]"              # With GPU support
+pip install -e ".[apple-silicon]"    # Apple Silicon optimized
 ```
 
 ### Usage
 
 #### GUI Mode (Recommended)
 ```bash
-# If you used setup.py or setup_apple_silicon.py:
+# With uv (fastest, automatic dependency management):
 uv run python main.py
 
-# Manual installation:
+# After installation with setup.py or setup_apple_silicon.py:
 python main.py
 ```
 
 #### CLI Mode (Future)
 ```bash
-# With uv
+# With uv (no installation needed)
 uv run python main.py --no-gui video.mp4
 
-# Traditional  
+# After installation
 python main.py --no-gui video.mp4
 ```
 
 #### Development with uv
 ```bash
-# Install dev dependencies
+# Install dev dependencies (modern way)
+uv pip install -e . --group dev
+
+# Or using optional dependencies
 uv pip install -e ".[dev]"
 
 # Run tests
@@ -116,6 +143,32 @@ uv run mypy src/
 
 # Run with specific Python version
 uv run --python 3.11 python main.py
+```
+
+## 🔧 Build System
+
+This project uses modern Python packaging standards:
+
+- **📦 Build Backend**: `hatchling` - Fast, modern PEP 517/518 compliant builder
+- **📋 Configuration**: Pure `pyproject.toml` - No `setup.py` needed
+- **⚡ Package Manager**: `uv` - Ultra-fast Python package installer and resolver
+- **🔄 Dependencies**: Modern `dependency-groups` for development dependencies
+
+### Key Benefits:
+- ✅ **Zero setup.py** - Pure `pyproject.toml` configuration
+- ✅ **Fast builds** - Hatchling is significantly faster than setuptools
+- ✅ **Modern standards** - Full PEP 517/518/621 compliance
+- ✅ **uv integration** - Seamless `uv run` support without installation
+- ✅ **Clean dependencies** - No deprecated configurations
+
+### pyproject.toml Structure:
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest", "black", "isort", "mypy", "ruff"]
 ```
 
 ## 🏗️ Architecture

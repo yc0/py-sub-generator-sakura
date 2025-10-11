@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "py-sub-generator-sakura"
@@ -110,9 +110,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# UV-specific configuration
-[tool.uv]
-dev-dependencies = [
+# Modern dependency groups (replaces deprecated tool.uv.dev-dependencies)
+[dependency-groups]
+dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
@@ -120,6 +120,9 @@ dev-dependencies = [
     "mypy>=1.0.0",
     "ruff>=0.0.280",
 ]
+
+# UV-specific configuration (no dev-dependencies needed here)
+[tool.uv]
 
 # Development tools configuration
 [tool.black]
@@ -153,4 +156,22 @@ addopts = [
     "--cov=src",
     "--cov-report=html",
     "--cov-report=term-missing",
+]
+
+# Hatchling build configuration
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+include = [
+    "main.py",
+    "config.json",
+    "src/**/*.py"
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "main.py",
+    "config.json", 
+    "src/",
+    "README.md",
+    "pyproject.toml"
 ]

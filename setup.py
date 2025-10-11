@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Setup script for Sakura Subtitle Generator."""
+"""Installation script for Sakura Subtitle Generator."""
 
 import sys
 import subprocess
@@ -59,42 +59,45 @@ def install_dependencies():
     # Check if uv is available
     use_uv = check_uv()
     
-    if use_uv:
-        print("🚀 Using uv for fast installation...")
-        installer = ['uv', 'pip', 'install']
-        sync_cmd = ['uv', 'pip', 'sync', 'requirements.txt']
-    else:
-        print("📦 Using pip for installation...")
-        installer = [sys.executable, '-m', 'pip', 'install']
-        sync_cmd = None
-    
     try:
-        if use_uv and sync_cmd:
-            # Use uv sync for faster installation
-            try:
-                subprocess.check_call(sync_cmd)
-                print("✅ Dependencies synced with uv")
-            except subprocess.CalledProcessError:
-                # Fallback to regular install
-                subprocess.check_call(installer + ['-r', 'requirements.txt'])
+        if use_uv:
+            print("🚀 Using uv for fast installation...")
+            print("💡 Installing in isolated uv environment (no system pollution)")
+            # Install project in editable mode with uv
+            subprocess.check_call(['uv', 'pip', 'install', '-e', '.'])
+            print("✅ Dependencies installed with uv")
         else:
-            # Use pip install
-            subprocess.check_call(installer + ['-r', 'requirements.txt'])
+            print("⚠️  WARNING: uv not found - falling back to pip")
+            print("� This will install packages in your current Python environment")
+            response = input("Continue with pip installation? (y/N): ")
+            if not response.lower().startswith('y'):
+                print("❌ Installation cancelled. Install uv with: pip install uv")
+                return False
+            # Install project in editable mode with pip
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-e', '.'])
+            print("✅ Dependencies installed with pip")
         
         print("✅ Dependencies installed successfully")
         
-        # Check for CUDA and offer GPU support
+        # Check for GPU support and offer additional packages
         try:
             import torch
             if torch.cuda.is_available():
-                response = input("🚀 CUDA detected! Install GPU support? (y/N): ")
+                response = input("🚀 CUDA detected! Install GPU optimized packages? (y/N): ")
                 if response.lower().startswith('y'):
-                    gpu_deps = ['torch>=2.0.0,<3.0.0', 'torchvision>=0.15.0', 'torchaudio>=2.0.0']
                     if use_uv:
-                        subprocess.check_call(['uv', 'pip', 'install'] + gpu_deps)
+                        subprocess.check_call(['uv', 'pip', 'install', '-e', '.[gpu]'])
                     else:
-                        subprocess.check_call([sys.executable, '-m', 'pip', 'install'] + gpu_deps)
-                    print("✅ GPU support installed")
+                        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-e', '.[gpu]'])
+                    print("✅ GPU optimized packages installed")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                response = input("🍎 MPS (Apple Silicon) detected! Install optimized packages? (y/N): ")
+                if response.lower().startswith('y'):
+                    if use_uv:
+                        subprocess.check_call(['uv', 'pip', 'install', '-e', '.[apple-silicon]'])
+                    else:
+                        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-e', '.[apple-silicon]'])
+                    print("✅ Apple Silicon optimized packages installed")
         except ImportError:
             pass
         
@@ -129,8 +132,8 @@ def check_apple_silicon():
 
 def main():
     """Main setup function."""
-    print("🌸 Sakura Subtitle Generator - Setup")
-    print("=" * 40)
+    print("🌸 Sakura Subtitle Generator - Installation")
+    print("=" * 42)
     
     # Check for Apple Silicon and suggest optimized setup
     check_apple_silicon()
@@ -156,18 +159,20 @@ def main():
     # Create directories
     create_directories()
     
-    print("\n🎉 Setup completed!")
+    print("\n🎉 Installation completed!")
     
     if not ffmpeg_ok:
         print("\n⚠️  Please install FFmpeg before running the application")
     
-    print("\n🚀 To start the application, run:")
-    print("   python main.py")
-    
     if has_uv:
-        print("\n⚡ With uv, you can also run:")
+        print("\n🚀 Recommended way to run (isolated environment):")
         print("   uv run python main.py")
-        print("   uv pip install -e .")
+        print("\n📦 Alternative (after installation):")
+        print("   python main.py")
+        print("\n💡 Tip: Use 'uv run' to avoid environment pollution!")
+    else:
+        print("\n🚀 To start the application, run:")
+        print("   python main.py")
     
     print("\n📖 For more information, see README.md")
 
