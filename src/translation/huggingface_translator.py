@@ -67,14 +67,13 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 pipeline_device = -1  # CPU
                 torch_dtype = torch.float32
 
-            # Create pipeline with consistent format preference
+            # Create pipeline with proper configuration
             self.pipeline = pipeline(
                 "translation",
                 model=self.model_name,
                 device=pipeline_device,
                 torch_dtype=torch_dtype,
                 max_length=self.max_length,
-                use_safetensors=True,  # Prefer safetensors format consistently
                 **self.pipeline_kwargs,
             )
 

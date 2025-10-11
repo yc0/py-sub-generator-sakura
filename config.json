@@ -15,7 +15,7 @@
     "max_length": 512
   },
   "sakura": {
-    "enabled": true,
+    "enabled": false,
     "model_name": "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF",
     "model_file": "sakura-14b-qwen2.5-v1.0-q4_k_m.gguf",
     "device": "auto",
