@@ -1,6 +1,5 @@
 """Whisper ASR implementation using native Whisper generate() method."""
 
-import logging
 from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
@@ -10,8 +9,6 @@ from ..models.subtitle_data import SubtitleSegment
 from ..models.video_data import AudioData
 from ..utils.logger import LoggerMixin
 from .base_asr import BaseASR
-
-logger = logging.getLogger(__name__)
 
 
 class WhisperASR(BaseASR, LoggerMixin):
@@ -136,9 +133,10 @@ class WhisperASR(BaseASR, LoggerMixin):
             # Set model to evaluation mode
             self.model.eval()
 
-            # Configure generation parameters
+            # Configure generation parameters for Whisper
             self.generation_config = {
                 "task": "transcribe",
+                "language": "ja",  # Set language explicitly
                 "return_timestamps": self.return_timestamps,
                 "num_beams": 1,  # Greedy decoding for consistency
                 "do_sample": False,  # Deterministic generation
@@ -150,8 +148,14 @@ class WhisperASR(BaseASR, LoggerMixin):
                 "begin_suppress_tokens": None,  # Don't suppress beginning tokens
             }
 
-            # Add custom generation kwargs
-            self.generation_config.update(self.generation_kwargs)
+            # Add custom generation kwargs (filter out invalid ones)
+            valid_kwargs = {}
+            invalid_params = ['name', 'model_name', 'device', 'batch_size', 'chunk_length_s']
+            for key, value in self.generation_kwargs.items():
+                if key not in invalid_params:
+                    valid_kwargs[key] = value
+            
+            self.generation_config.update(valid_kwargs)
 
             self.is_loaded = True
             self.logger.info(
@@ -233,6 +237,10 @@ class WhisperASR(BaseASR, LoggerMixin):
             self.logger.info(
                 f"Native transcription completed: {len(segments)} segments"
             )
+            
+            if len(segments) == 0:
+                self.logger.warning("No segments produced - this indicates the model generated no meaningful transcription")
+                
             return segments
 
         except Exception as e:
@@ -443,6 +451,7 @@ class WhisperASR(BaseASR, LoggerMixin):
                 decoded_text = self.tokenizer.decode(
                     new_tokens, skip_special_tokens=True
                 )
+                
                 if decoded_text.strip():
                     segment = SubtitleSegment(
                         start_time=0.0,
@@ -451,9 +460,13 @@ class WhisperASR(BaseASR, LoggerMixin):
                         confidence=None,
                     )
                     segments.append(segment)
+                else:
+                    self.logger.warning("Decoded text is empty or whitespace only")
 
         except Exception as e:
             self.logger.error(f"Error decoding tokens to segments: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
 
         return segments
 
@@ -471,11 +484,36 @@ class WhisperASR(BaseASR, LoggerMixin):
         segments = []
 
         try:
+            # Clean the decoded text (remove special tokens that aren't timestamps)
+            cleaned_text = decoded_text.strip()
+            
+            # Remove common non-timestamp special tokens
+            cleaned_text = re.sub(r'<\|startoftranscript\|>', '', cleaned_text)
+            cleaned_text = re.sub(r'<\|endoftranscript\|>', '', cleaned_text)
+            cleaned_text = re.sub(r'<\|notimestamps\|>', '', cleaned_text)
+            cleaned_text = re.sub(r'<\|ja\|>', '', cleaned_text)  # Language token
+            cleaned_text = cleaned_text.strip()
+
             # Whisper timestamp pattern: <|0.00|>text<|5.00|>
             timestamp_pattern = r"<\|(\d+\.?\d*)\|>"
 
+            # Check if we have timestamp tokens
+            timestamp_matches = re.findall(timestamp_pattern, cleaned_text)
+
+            if not timestamp_matches:
+                # No timestamp tokens found - create a single segment with the entire text
+                if cleaned_text:
+                    segment = SubtitleSegment(
+                        start_time=0.0,
+                        end_time=5.0,  # Default 5-second duration
+                        text=cleaned_text,
+                        confidence=None,
+                    )
+                    segments.append(segment)
+                return segments
+
             # Split by timestamp tokens
-            parts = re.split(timestamp_pattern, decoded_text)
+            parts = re.split(timestamp_pattern, cleaned_text)
 
             current_start = 0.0
             current_text = ""
@@ -575,141 +613,6 @@ class WhisperASR(BaseASR, LoggerMixin):
             self.logger.error(f"Error during batch transcription: {e}")
             return []
 
-    def _convert_to_segments(
-        self, whisper_result: Dict[str, Any]
-    ) -> List[SubtitleSegment]:
-        """Convert Whisper pipeline result to SubtitleSegment objects.
-
-        Args:
-            whisper_result: Result from Whisper pipeline
-
-        Returns:
-            List of SubtitleSegment objects
-        """
-        segments = []
-
-        try:
-            # Handle different result formats
-            if "chunks" in whisper_result:
-                # Chunked result with timestamps
-                for i, chunk in enumerate(whisper_result["chunks"]):
-                    timestamp = chunk.get("timestamp", [None, None])
-                    start_time = timestamp[0] if timestamp[0] is not None else 0.0
-                    end_time = (
-                        timestamp[1] if timestamp[1] is not None else start_time + 1.0
-                    )
-
-                    # Handle missing end timestamps (common Whisper issue)
-                    if end_time is None or end_time <= start_time:
-                        # Estimate end time based on text length and speech rate
-                        text_length = len(chunk["text"].strip())
-                        estimated_duration = max(
-                            text_length * 0.1, 1.0
-                        )  # ~10 chars per second
-                        end_time = start_time + estimated_duration
-
-                        if i == len(whisper_result["chunks"]) - 1:
-                            self.logger.warning(
-                                "Whisper missing end timestamp for final segment - estimated duration used"
-                            )
-
-                    segment = SubtitleSegment(
-                        start_time=start_time,
-                        end_time=end_time,
-                        text=chunk["text"].strip(),
-                        confidence=None,  # Whisper doesn't return confidence scores
-                    )
-                    if segment.text:  # Only add non-empty segments
-                        segments.append(segment)
-
-            elif "text" in whisper_result:
-                # Simple text result without timestamps
-                text = whisper_result["text"].strip()
-                if text:
-                    segment = SubtitleSegment(
-                        start_time=0.0,
-                        end_time=0.0,  # Will need to be estimated
-                        text=text,
-                        confidence=None,
-                    )
-                    segments.append(segment)
-
-            # Post-process segments
-            segments = self._post_process_segments(segments)
-
-        except Exception as e:
-            self.logger.error(f"Error converting Whisper result: {e}")
-
-        return segments
-
-    def _post_process_segments(
-        self, segments: List[SubtitleSegment]
-    ) -> List[SubtitleSegment]:
-        """Post-process segments for better quality.
-
-        Args:
-            segments: Raw segments from ASR
-
-        Returns:
-            Post-processed segments
-        """
-        processed_segments = []
-
-        for segment in segments:
-            # Clean up text
-            text = segment.text.strip()
-
-            # Skip very short or empty segments
-            if len(text) < 2:
-                continue
-
-            # Basic text cleaning
-            text = self._clean_text(text)
-
-            # Update segment
-            processed_segment = SubtitleSegment(
-                start_time=segment.start_time,
-                end_time=segment.end_time,
-                text=text,
-                confidence=segment.confidence,
-                speaker_id=segment.speaker_id,
-            )
-
-            processed_segments.append(processed_segment)
-
-        return processed_segments
-
-    def _clean_text(self, text: str) -> str:
-        """Clean transcribed text.
-
-        Args:
-            text: Raw transcribed text
-
-        Returns:
-            Cleaned text
-        """
-        # Remove extra whitespace
-        text = " ".join(text.split())
-
-        # Remove common artifacts
-        artifacts = [
-            "♪",
-            "♫",
-            "♬",
-            "♩",  # Music notes
-            "[音楽]",
-            "[Music]",
-            "[MUSIC]",  # Music tags
-            "[拍手]",
-            "[Applause]",
-            "[APPLAUSE]",  # Applause tags
-        ]
-
-        for artifact in artifacts:
-            text = text.replace(artifact, "").strip()
-
-        return text
-
     def unload_model(self):
         """Unload Whisper model and free memory."""
         # Clean up native Whisper components
@@ -724,34 +627,3 @@ class WhisperASR(BaseASR, LoggerMixin):
         super().unload_model()
 
         self.logger.info("Whisper model unloaded")
-
-    @classmethod
-    def get_longform_recommendations(cls) -> Dict[str, Any]:
-        """Get recommended configuration for long-form transcription.
-
-        Returns:
-            Dictionary with recommended settings
-        """
-        return {
-            "chunk_length_s": 30,  # Whisper's optimal chunk size
-            "stride_length_s": 1.0,  # Small overlap between chunks
-            "max_new_tokens": 128,  # Prevent runaway generation
-            "return_timestamps": True,  # Essential for subtitles and WhisperTimeStampLogitsProcessor
-            "ignore_warning": True,  # Suppress experimental warnings
-            "batch_size": 1,  # Conservative for memory
-            "generate_kwargs": {
-                "return_timestamps": True,  # Ensures WhisperTimeStampLogitsProcessor is used
-                "num_beams": 1,  # Better timestamp accuracy
-                "do_sample": False,  # Deterministic generation
-                "forced_decoder_ids": None,  # Auto language detection
-            },
-            "notes": [
-                "return_timestamps=True ensures WhisperTimeStampLogitsProcessor is used during generation",
-                "WhisperTimeStampLogitsProcessor automatically handles timestamp prediction",
-                "For production use, consider using Whisper's generate() method directly",
-                "chunk_length_s is experimental but works well for most cases",
-                "Missing end timestamps are automatically estimated using text length heuristics",
-                "Use smaller chunks (15s) for better timestamp accuracy",
-                "Deterministic generation (do_sample=False) improves timestamp consistency",
-            ],
-        }
