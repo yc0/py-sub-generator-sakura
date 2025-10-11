@@ -5,7 +5,8 @@ A powerful, well-architected application for generating Japanese subtitles with 
 ## ✨ Features
 
 - **🎙️ Japanese ASR**: High-quality Japanese speech recognition using OpenAI Whisper
-- **🌐 Multi-language Translation**: Translate to English and Traditional Chinese using Hugging Face models  
+- **🌐 Multi-language Translation**: Translate to English and Traditional Chinese using Hugging Face models
+- **🎯 Dual Language Subtitle Output**: Generate both original Japanese and translated subtitle files with customizable file name suffixes  
 - **🖥️ User-Friendly GUI**: Clean Tkinter interface for easy video processing
 - **⚙️ Configurable**: Comprehensive settings for models, devices, and output preferences
 - **🏗️ Well-Architected**: Modular design with clean separation of concerns
@@ -169,6 +170,46 @@ uv run python main.py --no-gui video.mp4
 python main.py --no-gui video.mp4
 ```
 
+## 🎯 Dual Language Subtitle Feature
+
+### **🌸 Generate Both Japanese and Translated Subtitles**
+
+The application supports **dual language subtitle output**, perfect for language learning and multilingual content creation:
+
+#### ✨ **Feature Highlights:**
+- **🎌 Japanese Original Subtitles**: Preserves original ASR transcription results
+- **🌐 Translated Subtitles**: Simultaneously generates target language (e.g., Chinese, English) subtitles  
+- **⚙️ UI Controls**: Convenient toggle option in settings dialog
+- **📝 Custom File Naming**: Configurable file suffixes (e.g., `_ja.srt`, `_zh.srt`)
+- **🎯 Flexible Output**: Choose to generate single or dual language subtitles as needed
+
+#### 🛠️ **How to Use:**
+
+**Via GUI Settings:**
+1. Click the **⚙️ Settings** button
+2. Find the **"Dual Language Output"** option in the settings dialog
+3. Check **"Generate both language subtitles"**
+4. Optional: Click **"Advanced Options"** to customize file suffixes
+5. Settings are automatically saved
+
+**File Output Example:**
+```
+video.mp4 → 
+├── video_ja.srt    (Japanese original subtitles)
+└── video_zh.srt    (Chinese translated subtitles)
+```
+
+**Advanced Customization:**
+- **Japanese Suffix**: Default `_ja` (can change to `_japanese`, `_orig`, etc.)
+- **Translated Suffix**: Default `_zh` (can change to `_chinese`, `_trans`, etc.)
+- **File Naming**: Fully customizable for workflow integration
+
+#### 🎬 **Perfect Use Cases:**
+- **🎓 Language Learning**: Compare original and translated text for learning
+- **📺 Multilingual Content**: Provide options for different audiences
+- **🔄 Translation Comparison**: Check translation quality and accuracy
+- **📚 Subtitle Production**: Professional subtitle creation workflows
+
 #### Development with uv
 ```bash
 # Install dev dependencies (modern way)
@@ -319,6 +360,11 @@ The application uses a JSON configuration file with sensible defaults:
     "ja_to_en_model": "Helsinki-NLP/opus-mt-ja-en", 
     "en_to_zh_model": "Helsinki-NLP/opus-mt-en-zh",
     "batch_size": 8
+  },
+  "dual_language": {
+    "generate_both_languages": false,
+    "japanese_suffix": "_ja",
+    "translated_suffix": "_zh"
   },
   "ui": {
     "window_size": "800x600",
@@ -656,12 +702,12 @@ If you're limited to CPU-only inference:
 ## 📋 Workflow
 
 1. **🎬 Video Input**: Select video file through file browser
-2. **⚙️ Configuration**: Choose target languages and settings
+2. **⚙️ Configuration**: Choose target languages, dual language output, and settings
 3. **🔍 Validation**: Verify video format and extract metadata  
 4. **🎵 Audio Extraction**: Extract audio using FFmpeg
 5. **🎙️ ASR Processing**: Generate Japanese transcription with Whisper
 6. **🌐 Translation**: Translate to English and Traditional Chinese
-7. **📝 Subtitle Generation**: Create formatted subtitle files
+7. **📝 Subtitle Generation**: Create formatted subtitle files (single or dual language)
 8. **👁️ Preview & Export**: Review results and export SRT files
 
 ## 🚦 Error Handling
@@ -717,12 +763,14 @@ If you're limited to CPU-only inference:
 - **Zero Experimental Warnings** - Eliminated all ASR warnings for clean operation  
 - **Production Ready** - Following Whisper paper best practices (Section 3.8)
 - **Performance Optimized** - Better memory usage and generation efficiency
+- **Dual Language Subtitle Generation** - Support for simultaneous Japanese and translated subtitle file output
 
 ### 🎯 Key Improvements
 - ✅ **No Token Limits** - Removed artificial generation constraints
 - ✅ **Silent Operation** - Clean logs without experimental warnings
 - ✅ **Better Quality** - Using Whisper's intended architecture
 - ✅ **Full Device Support** - Maintained MPS/CUDA/CPU compatibility
+- ✅ **Dual Language Output** - Configurable Japanese + translated subtitle file generation
 
 *For complete technical details, see [TECHNICAL_CHANGELOG.md](TECHNICAL_CHANGELOG.md)*
 
