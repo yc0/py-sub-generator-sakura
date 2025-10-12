@@ -131,7 +131,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
             return False
 
     def translate_text(
-        self, text: str, progress_callback: Optional[Callable[[float], None]] = None
+        self, text: str, progress_callback: Optional[Callable[[str, float], None]] = None
     ) -> TranslationResult:
         """Translate a single text string.
 
@@ -155,7 +155,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
 
         try:
             if progress_callback:
-                progress_callback(0.0)
+                progress_callback("translation", 0.0)
 
             # Preprocess text
             processed_text = self._preprocess_text(text)
@@ -171,7 +171,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 )
 
             if progress_callback:
-                progress_callback(0.2)
+                progress_callback("translation", 0.2)
 
             # Translate
             if self.is_nllb:
@@ -180,7 +180,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 result = self.pipeline(processed_text)
 
             if progress_callback:
-                progress_callback(0.8)
+                progress_callback("translation", 0.8)
 
             # Extract translated text
             if isinstance(result, list) and len(result) > 0:
@@ -194,7 +194,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
             translated_text = self._postprocess_text(translated_text)
 
             if progress_callback:
-                progress_callback(1.0)
+                progress_callback("translation", 1.0)
 
             return TranslationResult(
                 original_text=text,
@@ -219,7 +219,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
     def translate_batch(
         self,
         texts: List[str],
-        progress_callback: Optional[Callable[[float], None]] = None,
+        progress_callback: Optional[Callable[[str, float], None]] = None,
     ) -> List[TranslationResult]:
         """Translate multiple texts in batch.
 
@@ -315,7 +315,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 # Update progress
                 if progress_callback:
                     progress = min((i + len(batch_texts)) / total_texts, 1.0)
-                    progress_callback(progress)
+                    progress_callback("translation", progress)
 
             self.logger.info(f"Batch translation completed: {len(results)} texts")
             return results
@@ -411,7 +411,7 @@ class MultiStageTranslator:
     def translate_to_both(
         self,
         texts: List[str],
-        progress_callback: Optional[Callable[[float], None]] = None,
+        progress_callback: Optional[Callable[[str, float], None]] = None,
     ) -> Dict[str, List[TranslationResult]]:
         """Translate Japanese texts to both English and Chinese.
 
@@ -425,21 +425,21 @@ class MultiStageTranslator:
         try:
             # Translate to English
             if progress_callback:
-                progress_callback(0.0)
+                progress_callback("translation", 0.0)
 
-            en_results = self.ja_en_translator.translate_batch(texts)
+            en_results = self.ja_en_translator.translate_batch(texts, progress_callback=progress_callback)
 
             if progress_callback:
-                progress_callback(0.5)
+                progress_callback("translation", 0.5)
 
             # Extract English texts for further translation
             en_texts = [result.translated_text for result in en_results]
 
             # Translate English to Chinese
-            zh_results = self.en_zh_translator.translate_batch(en_texts)
+            zh_results = self.en_zh_translator.translate_batch(en_texts, progress_callback=progress_callback)
 
             if progress_callback:
-                progress_callback(1.0)
+                progress_callback("translation", 1.0)
 
             return {"en": en_results, "zh": zh_results}
 

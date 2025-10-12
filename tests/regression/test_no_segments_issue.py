@@ -40,8 +40,7 @@ class TestNoSegmentsIssue:
     @pytest.fixture(scope="class")
     def asr(self):
         """Create WhisperASR instance for testing."""
-        config = Config()
-        asr = WhisperASR(config)
+        asr = WhisperASR(model_name="kotoba-tech/kotoba-whisper-v2.1", device="auto", language="ja")
         success = asr.load_model()
         if not success:
             pytest.skip("WhisperASR model could not be loaded")
@@ -132,7 +131,7 @@ def main():
     from src.asr.whisper_asr import WhisperASR
     
     config = Config()
-    asr = WhisperASR(config)
+    asr = WhisperASR(model_name="kotoba-tech/kotoba-whisper-v2.1", device="auto", language="ja")
     
     if not asr.load_model():
         print("❌ Could not load WhisperASR model")

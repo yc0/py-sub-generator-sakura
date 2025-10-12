@@ -45,6 +45,17 @@ class SubtitleProcessor(LoggerMixin):
         Returns:
             Processed and optimized segments
         """
+        # Defensive: log and check types before processing
+        try:
+            for idx, seg in enumerate(segments):
+                if isinstance(seg, np.ndarray):
+                    self.logger.error(f"[SubtitleProcessor] Segment {idx} is a numpy array, which is invalid. Segment: {seg}")
+                elif not hasattr(seg, 'start_time') or not hasattr(seg, 'end_time'):
+                    self.logger.error(f"[SubtitleProcessor] Segment {idx} is not a SubtitleSegment: {type(seg)} {seg}")
+        except Exception as e:
+            import traceback
+            self.logger.error(f"[SubtitleProcessor] Exception while checking segment types: {e}\n{traceback.format_exc()}")
+
         try:
             # Step 1: Clean text content
             segments = self._clean_segments(segments)

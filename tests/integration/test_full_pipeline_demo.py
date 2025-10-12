@@ -48,8 +48,7 @@ class TestFullPipelineDemo:
     @pytest.fixture
     def whisper_asr(self):
         """WhisperASR instance for Japanese transcription"""
-        config = Config()
-        return WhisperASR(config)
+        return WhisperASR(model_name="kotoba-tech/kotoba-whisper-v2.1", device="auto", language="ja")
     
     @pytest.fixture
     def audio_processor(self):

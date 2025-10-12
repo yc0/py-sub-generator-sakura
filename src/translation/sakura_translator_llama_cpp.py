@@ -10,7 +10,6 @@ from .base_translator import BaseTranslator
 
 logger = logging.getLogger(__name__)
 
-
 class SakuraTranslator(BaseTranslator):
     """SakuraLLM translator using llama-cpp-python for GGUF model support."""
 
@@ -157,7 +156,7 @@ class SakuraTranslator(BaseTranslator):
 
         return None
 
-    def translate_text(self, text: str, progress_callback: Optional[Callable[[float], None]] = None) -> TranslationResult:
+    def translate_text(self, text: str, progress_callback: Optional[Callable[[str, float], None]] = None) -> TranslationResult:
         """Translate Japanese text to Chinese using SakuraLLM.
         
         Args:
@@ -171,14 +170,14 @@ class SakuraTranslator(BaseTranslator):
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
         if progress_callback:
-            progress_callback(0.0)
+            progress_callback("translation", 0.0)
 
         try:
             # Create SakuraLLM prompt
             prompt = self._create_translation_prompt(text)
 
             if progress_callback:
-                progress_callback(0.3)
+                progress_callback("translation", 0.3)
 
             # Generate translation
             response = self.llm(
@@ -192,7 +191,7 @@ class SakuraTranslator(BaseTranslator):
             )
 
             if progress_callback:
-                progress_callback(0.8)
+                progress_callback("translation", 0.8)
 
             # Extract translated text
             translated_text = response["choices"][0]["text"].strip()
@@ -201,7 +200,7 @@ class SakuraTranslator(BaseTranslator):
             translated_text = self._clean_translation(translated_text)
 
             if progress_callback:
-                progress_callback(1.0)
+                progress_callback("translation", 1.0)
 
             return TranslationResult(
                 original_text=text,
@@ -258,14 +257,18 @@ class SakuraTranslator(BaseTranslator):
 
         for i, text in enumerate(texts):
             if progress_callback:
-                progress_callback(f"Translating {i+1}/{total}", i / total)
+                progress_callback("translation", i / total)
 
-            result = self.translate_text(text)
+            result = self.translate_text(text, progress_callback=progress_callback)
             results.append(result)
 
         if progress_callback:
-            progress_callback("Translation complete", 1.0)
+            progress_callback("translation", 1.0)
 
+       
+        logger.debug(f"[SakuraTranslator] original texts: {texts}\n")
+        logger.debug(f"[SakuraTranslator] translate_batch result: {[str(r) for r in results]}\n")
+       
         return results
 
     def unload_model(self):

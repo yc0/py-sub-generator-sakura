@@ -36,9 +36,7 @@ class SubtitleGenerator(LoggerMixin):
         self.asr = WhisperASR(
             model_name=asr_config.get("model_name", "openai/whisper-large-v3"),
             device=asr_config.get("device", "auto"),
-            batch_size=asr_config.get("batch_size", 1),
-            return_timestamps=asr_config.get("return_timestamps", True),
-            chunk_length_s=asr_config.get("chunk_length", 30),
+            language=asr_config.get("language", "ja"),
         )
 
         # Initialize translation pipeline
@@ -71,45 +69,47 @@ class SubtitleGenerator(LoggerMixin):
         try:
             self.logger.info(f"Starting subtitle generation for: {video_path}")
 
+
             # Stage 1: Validate and load video
             if progress_callback:
                 progress_callback("validation", 0.0)
-
             video_file = self._validate_and_load_video(video_path)
             if not video_file:
                 return None
-
             if progress_callback:
                 progress_callback("validation", 1.0)
 
             # Stage 2: Extract audio
             if progress_callback:
                 progress_callback("audio_extraction", 0.0)
-
             audio_data = self._extract_audio(video_file)
             if not audio_data:
                 return None
-
             if progress_callback:
                 progress_callback("audio_extraction", 1.0)
 
             # Stage 3: Perform ASR
             if progress_callback:
                 progress_callback("asr", 0.0)
-
             segments = self._perform_asr(
                 audio_data,
-                progress_callback=lambda p: (
-                    progress_callback("asr", p) if progress_callback else None
-                ),
+                progress_callback=progress_callback,
             )
-
+            # Defensive: log and check types before boolean check
+            try:
+                for idx, seg in enumerate(segments):
+                    import numpy as np
+                    if isinstance(seg, np.ndarray):
+                        self.logger.error(f"[SubtitleGenerator] Segment {idx} is a numpy array, which is invalid. Segment: {seg}")
+                    elif not hasattr(seg, 'start_time') or not hasattr(seg, 'end_time'):
+                        self.logger.error(f"[SubtitleGenerator] Segment {idx} is not a SubtitleSegment: {type(seg)} {seg}")
+            except Exception as e:
+                import traceback
+                self.logger.error(f"[SubtitleGenerator] Exception while checking segment types: {e}\n{traceback.format_exc()}")
             if not segments:
                 self.logger.error("ASR failed to produce any segments")
                 return None
-
-            if progress_callback:
-                progress_callback("asr", 1.0)
+            # Do not set progress_callback("asr", 1.0) here; let ASR/translation pipeline handle fine-grained progress
 
             # Create subtitle file
             subtitle_file = SubtitleFile(
@@ -121,11 +121,15 @@ class SubtitleGenerator(LoggerMixin):
 
             # Stage 4: Perform translation
             if target_languages:
+                if progress_callback:
+                    progress_callback("translation", 0.0)
                 subtitle_file = self.translation_pipeline.translate_subtitle_file(
                     subtitle_file,
                     target_languages=target_languages,
                     progress_callback=progress_callback,
                 )
+                if progress_callback:
+                    progress_callback("translation", 1.0)
 
             self.logger.info(f"Subtitle generation completed: {len(segments)} segments")
             return subtitle_file
@@ -200,13 +204,13 @@ class SubtitleGenerator(LoggerMixin):
     def _perform_asr(
         self,
         audio_data: AudioData,
-        progress_callback: Optional[Callable[[float], None]] = None,
+        progress_callback: Optional[Callable[[str, float], None]] = None,
     ) -> List[SubtitleSegment]:
         """Perform automatic speech recognition on audio.
 
         Args:
             audio_data: AudioData to transcribe
-            progress_callback: Optional progress callback
+            progress_callback: Optional progress callback (stage, progress)
 
         Returns:
             List of subtitle segments

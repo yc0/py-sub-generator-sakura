@@ -27,8 +27,12 @@ def setup_logger(
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper()))
 
+    # Always attach handlers to the root logger so all loggers output as expected
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, level.upper()))
+
     # Clear existing handlers to avoid duplicates
-    logger.handlers.clear()
+    root_logger.handlers.clear()
 
     # Default format
     if log_format is None:
@@ -38,9 +42,9 @@ def setup_logger(
 
     # Console handler
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(root_logger.level)
     console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    root_logger.addHandler(console_handler)
 
     # File handler (if specified)
     if log_file:
@@ -57,10 +61,13 @@ def setup_logger(
             )
             file_handler.setLevel(getattr(logging, level.upper()))
             file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
+            root_logger.addHandler(file_handler)
 
         except Exception as e:
-            logger.warning(f"Failed to create file handler: {e}")
+            root_logger.warning(f"Failed to create file handler: {e}")
+
+    # Ensure all loggers propagate to root so all handlers are used
+    logger.propagate = True
 
     return logger
 

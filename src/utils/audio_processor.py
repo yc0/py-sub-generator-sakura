@@ -59,19 +59,15 @@ class AudioProcessor:
             return None
 
     def extract_audio_from_video(self, video_file: VideoFile) -> Optional[AudioData]:
-        """Extract audio from video file.
-
-        Args:
-            video_file: VideoFile object containing video metadata
-
-        Returns:
-            AudioData object or None if extraction fails
-        """
+        """Extract audio from video file or load directly if already audio."""
         try:
-            import ffmpeg
-
             logger.info(f"Extracting audio from: {video_file.filename}")
+            # If the file is already a wav, load directly
+            if str(video_file.file_path).lower().endswith('.wav'):
+                logger.info("Input is a wav file, loading directly.")
+                return self.load_audio_file(video_file.file_path)
 
+            import ffmpeg
             # Create temporary audio file
             temp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
             temp_audio_path = temp_audio.name
@@ -115,7 +111,7 @@ class AudioProcessor:
                         output_path,
                         acodec="pcm_s16le",  # 16-bit PCM
                         ar=self.target_sample_rate,  # Target sample rate
-                        ac=1,  # Mono channel
+                        # ac=1,  # Mono channel
                     )
                     .overwrite_output()
                     .run(quiet=True)
@@ -133,7 +129,7 @@ class AudioProcessor:
                 output_path,
                 acodec="pcm_s16le",  # 16-bit PCM
                 ar=self.target_sample_rate,  # Target sample rate
-                ac=1,  # Mono channel
+                # ac=1,  # Mono channel
             )
             .overwrite_output()
             .run(quiet=True)
@@ -159,6 +155,7 @@ class AudioProcessor:
 
             # Calculate duration
             duration = len(audio_array) / sample_rate
+            print(f"[DEBUG] Loaded audio: shape={audio_array.shape}, sample_rate={sample_rate}, duration={duration:.2f}s, expected_samples={int(duration*sample_rate)}")
 
             return AudioData(
                 audio_array=audio_array,
@@ -198,8 +195,11 @@ class AudioProcessor:
             if max_val > 0:
                 audio_array = audio_array / max_val
 
-            # Remove silence from beginning and end
-            audio_array = self._trim_silence(audio_array)
+
+            # Silence trimming is disabled for long-form ASR to avoid truncating content
+            # audio_array = self._trim_silence(audio_array)
+            # trimmed_duration = len(audio_array) / audio_data.sample_rate
+            # print(f"[DEBUG] After silence trim: shape={audio_array.shape}, duration={trimmed_duration:.2f}s, sample_rate={audio_data.sample_rate}")
 
             logger.info(
                 f"Audio preprocessed: {len(audio_array)} samples, "
@@ -254,6 +254,7 @@ class AudioProcessor:
     def split_audio_chunks(
         self, audio_data: AudioData, chunk_duration: float = 30.0, overlap: float = 1.0
     ) -> list[AudioData]:
+        print(f"[DEBUG] split_audio_chunks called: duration={audio_data.duration:.2f}s, sample_rate={audio_data.sample_rate}, chunk_duration={chunk_duration}, overlap={overlap}")
         """Split audio into overlapping chunks for processing.
 
         Args:
@@ -275,15 +276,20 @@ class AudioProcessor:
             chunks = []
             start = 0
 
+
+            chunk_idx = 0
+            last_end = 0
             while start < len(audio_array):
                 end = min(start + chunk_samples, len(audio_array))
                 chunk_audio = audio_array[start:end]
 
-                # Skip very short chunks
-                if len(chunk_audio) < sample_rate:  # Less than 1 second
+                if len(chunk_audio) == 0:
                     break
 
                 chunk_duration_actual = len(chunk_audio) / sample_rate
+
+                logger.info(f"Chunk {chunk_idx}: start={start}, end={end}, duration={chunk_duration_actual:.2f}s, samples={len(chunk_audio)}")
+                print(f"Chunk {chunk_idx}: start={start}, end={end}, duration={chunk_duration_actual:.2f}s, samples={len(chunk_audio)}")
 
                 chunks.append(
                     AudioData(
@@ -295,7 +301,29 @@ class AudioProcessor:
                     )
                 )
 
+                last_end = end
                 start += step_samples
+                chunk_idx += 1
+
+            # Ensure the last chunk covers the end of the audio
+            if last_end < len(audio_array):
+                start = len(audio_array) - chunk_samples
+                if start < 0:
+                    start = 0
+                end = len(audio_array)
+                chunk_audio = audio_array[start:end]
+                chunk_duration_actual = len(chunk_audio) / sample_rate
+                logger.info(f"Chunk {chunk_idx} (final): start={start}, end={end}, duration={chunk_duration_actual:.2f}s, samples={len(chunk_audio)}")
+                print(f"Chunk {chunk_idx} (final): start={start}, end={end}, duration={chunk_duration_actual:.2f}s, samples={len(chunk_audio)}")
+                chunks.append(
+                    AudioData(
+                        audio_array=chunk_audio,
+                        sample_rate=sample_rate,
+                        duration=chunk_duration_actual,
+                        channels=audio_data.channels,
+                        bit_depth=audio_data.bit_depth,
+                    )
+                )
 
             logger.info(f"Audio split into {len(chunks)} chunks")
             return chunks

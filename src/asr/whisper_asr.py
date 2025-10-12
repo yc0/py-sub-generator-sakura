@@ -9,16 +9,150 @@ from ..models.subtitle_data import SubtitleSegment
 from ..models.video_data import AudioData
 from ..utils.logger import LoggerMixin
 from .base_asr import BaseASR
+from transformers import pipeline
 
+class WhisperASR(LoggerMixin):
+    def unload_model(self):
+        """No-op for compatibility. Does nothing."""
+        pass
 
-class WhisperASR(BaseASR, LoggerMixin):
+    def transcribe_batch(self, audio_chunks, language=None, progress_callback=None):
+        """Transcribe a list of AudioData chunks, returning one segment per chunk (real or empty), preserving chunk count and order."""
+        all_segments = []
+        time_offset = 0.0
+        for idx, audio_data in enumerate(audio_chunks):
+            segments = self.transcribe_audio(audio_data, language=language, progress_callback=progress_callback)
+            # If speech detected, merge all text in this chunk into one segment
+            if segments:
+                merged_text = " ".join([seg.text for seg in segments if seg.text])
+                # Use the earliest start and latest end among all segments
+                start = min(seg.start_time for seg in segments)
+                end = max(seg.end_time for seg in segments)
+                all_segments.append(
+                    SubtitleSegment(
+                        start_time=time_offset + start,
+                        end_time=time_offset + end,
+                        text=merged_text,
+                        confidence=None,
+                        speaker_id=None
+                    )
+                )
+            else:
+                # No speech: insert empty segment for this chunk's window
+                all_segments.append(
+                    SubtitleSegment(
+                        start_time=time_offset,
+                        end_time=time_offset + audio_data.duration,
+                        text="",
+                        confidence=None,
+                        speaker_id=None
+                    )
+                )
+            time_offset += audio_data.duration
+            if progress_callback:
+                progress_callback("asr", (idx + 1) / len(audio_chunks))
+        return all_segments
+    def load_model(self):
+        """No-op for compatibility. Pipeline loads on demand."""
+        return True
+    def transcribe_audio(self, audio_data, language=None, progress_callback=None):
+        """Transcribe AudioData and return a list of SubtitleSegment for compatibility with old interface."""
+        import tempfile
+        import soundfile as sf
+        # Write audio to a temporary wav file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
+            sf.write(tmp.name, audio_data.audio_array, audio_data.sample_rate)
+            lang = language or self.language
+            # Use pipeline to get segments with timestamps
+            self.logger.debug(f"[WhisperASR] Transcribing audio of duration {audio_data.duration:.2f}s with language={lang}")
+            if progress_callback:
+                progress_callback("asr", 0.0)
+            result = self.pipe(
+                tmp.name,
+                generate_kwargs={"language": lang, "return_timestamps": True}
+            )
+            self.logger.debug(f"[WhisperASR] Pipeline output: {result}")
+            if progress_callback:
+                progress_callback("asr", 1.0)
+            segments = []
+            # Try to extract timestamps from result['chunks'] if available
+            if isinstance(result, dict) and "chunks" in result and result["chunks"]:
+                for chunk in result["chunks"]:
+                    # Newer transformers may provide 'timestamp' or 'timestamps' or 'offsets'
+                    start = None
+                    end = None
+                    if "timestamp" in chunk and isinstance(chunk["timestamp"], list):
+                        start, end = chunk["timestamp"]
+                    elif "timestamps" in chunk and isinstance(chunk["timestamps"], list):
+                        start, end = chunk["timestamps"]
+                    elif "offsets" in chunk and isinstance(chunk["offsets"], dict):
+                        start = chunk["offsets"].get("start", 0)
+                        end = chunk["offsets"].get("end", 0)
+                    else:
+                        start = 0.0
+                        end = float(getattr(audio_data, "duration", 0))
+                    segments.append(SubtitleSegment(
+                        start_time=start,
+                        end_time=end,
+                        text=chunk.get("text", ""),
+                        confidence=chunk.get("confidence", None)
+                    ))
+            elif isinstance(result, dict) and "text" in result:
+                # Fallback: one segment for the whole text
+                segments.append(SubtitleSegment(
+                    start_time=0.0,
+                    end_time=float(getattr(audio_data, "duration", 0)),
+                    text=result["text"],
+                    confidence=None
+                ))
+            return segments
+    """Minimal Whisper ASR using Hugging Face pipeline with hardware acceleration support."""
+    def __init__(self, model_name="openai/whisper-large-v3", device=None, language="ja"):
+        super().__init__()
+        self.model_name = model_name
+        self.language = language
+        # device: 'cuda', 'mps', 'cpu', or None (auto)
+        if device is None or device == "auto":
+            import torch
+            self.logger.debug(f"[WhisperASR] torch.cuda.is_available(): {torch.cuda.is_available()}")
+            mps_available = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+            self.logger.debug(f"[WhisperASR] torch.backends.mps.is_available(): {mps_available}")
+            if torch.cuda.is_available():
+                device = "cuda"
+            elif mps_available:
+                device = "mps"
+            else:
+                device = "cpu"
+        self.device = device
+        self.logger.debug(f"[WhisperASR] Using model name: {self.model_name}, device: {self.device}")
+        self.pipe = pipeline(
+            "automatic-speech-recognition",
+            model=self.model_name,
+            device=self.device,
+            return_timestamps=True,
+            # chunk_length_s=30,
+            model_kwargs={"torch_dtype": "auto"},
+        )
+
+    def transcribe(self, audio_path: str) -> str:
+        """Transcribe an audio file and return the recognized text."""
+        result = self.pipe(audio_path, generate_kwargs={"language": self.language})
+        return result["text"] if isinstance(result, dict) and "text" in result else str(result)
+
+    def transcribe_segments(self, audio_path: str) -> list:
+        """Transcribe an audio file and return segments (if supported by the model)."""
+        result = self.pipe(audio_path, generate_kwargs={"language": self.language, "return_timestamps": True})
+        if isinstance(result, dict) and "chunks" in result:
+            return result["chunks"]
+        return []
+
+class DeprecatedWhisperASR(BaseASR, LoggerMixin):
     """Whisper ASR implementation using native Whisper generate() method.
 
     This implementation uses Whisper's native sliding window approach for
     long-form transcription as described in Section 3.8 of the Whisper paper.
     This provides better quality, no token limits, and eliminates experimental warnings.
     """
-
     def __init__(
         self,
         model_name: str = "openai/whisper-large-v3",
@@ -179,6 +313,7 @@ class WhisperASR(BaseASR, LoggerMixin):
         language: str = "ja",
         progress_callback: Optional[Callable[[float], None]] = None,
     ) -> List[SubtitleSegment]:
+        self.logger.debug("[ASR] Entered transcribe_audio")
         """Transcribe audio using Whisper's native generate() method.
 
         Args:
@@ -189,6 +324,7 @@ class WhisperASR(BaseASR, LoggerMixin):
         Returns:
             List of subtitle segments with timestamps
         """
+        self.logger.debug("[ASR] Entered transcribe_audio")
         if not self.is_loaded:
             if not self.load_model():
                 return []
@@ -197,6 +333,11 @@ class WhisperASR(BaseASR, LoggerMixin):
             self.logger.info(
                 f"Transcribing audio: {audio_data.duration:.2f}s using native Whisper"
             )
+            # Log first 10 samples for inspection
+            if hasattr(audio_data, 'audio_array') and audio_data.audio_array is not None:
+                self.logger.debug(f"[ASR] First 10 audio samples: {audio_data.audio_array[:10]}")
+            else:
+                self.logger.warning("[ASR] audio_data.audio_array is None!")
 
             if progress_callback:
                 progress_callback(0.0)
@@ -207,6 +348,7 @@ class WhisperASR(BaseASR, LoggerMixin):
             if progress_callback:
                 progress_callback(0.2)
 
+
             # Set forced decoder IDs for language and task (Whisper's proper way)
             language_token = self.tokenizer.convert_tokens_to_ids(f"<|{language}|>")
             task_token = self.tokenizer.convert_tokens_to_ids("<|transcribe|>")
@@ -215,6 +357,9 @@ class WhisperASR(BaseASR, LoggerMixin):
                 (1, language_token),  # Language token at position 1
                 (2, task_token),  # Task token at position 2
             ]
+            self.logger.debug(f"[ASR] Forced decoder IDs: {forced_decoder_ids}")
+            self.logger.debug(f"[ASR] Model loaded: {self.is_loaded}, Model device: {self.torch_device}, Model dtype: {self.torch_dtype}")
+            self.logger.debug(f"[ASR] Generation config: {self.generation_kwargs}")
 
             if progress_callback:
                 progress_callback(0.3)
@@ -234,17 +379,41 @@ class WhisperASR(BaseASR, LoggerMixin):
             if progress_callback:
                 progress_callback(1.0)
 
+
             self.logger.info(
                 f"Native transcription completed: {len(segments)} segments"
             )
 
             if len(segments) == 0:
                 self.logger.warning("No segments produced - this indicates the model generated no meaningful transcription")
-
+                audio_array = getattr(audio_data, 'audio_array', None)
+                shape = audio_array.shape if audio_array is not None else None
+                self.logger.debug(f"[ASR] segments empty. audio_data: duration={audio_data.duration}, sample_rate={audio_data.sample_rate}, shape={shape}")
+                # Log a sample of the input features for further diagnosis
+                try:
+                    audio_features = self._preprocess_audio(audio_data)
+                    self.logger.debug(f"[ASR] Sample of input features: {audio_features.flatten()[:10]}")
+                except Exception as e:
+                    self.logger.error(f"[ASR] Could not log input features: {e}")
+            # Defensive: check for ambiguous truth value in segments
+            try:
+                for idx, seg in enumerate(segments):
+                    if isinstance(seg, np.ndarray):
+                        self.logger.error(f"[ASR] Segment {idx} is a numpy array, which is invalid. Segment: {seg}")
+                    # Avoid using seg in a boolean context
+            except Exception as e:
+                import traceback
+                self.logger.error(f"[ASR] Exception while iterating segments: {e}\n{traceback.format_exc()}")
+            # Diagnostic: log type and value of segments before returning
+            self.logger.debug(f"[ASR] Returning segments of type: {type(segments)}, value: {repr(segments)}")
             return segments
 
         except Exception as e:
-            self.logger.error(f"Error during native transcription: {e}")
+            import traceback
+            # Diagnostic: log type and value of segments if defined
+            if 'segments' in locals():
+                self.logger.error(f"[ASR] Exception caught. segments type: {type(segments)}, value: {repr(segments)}")
+            self.logger.error(f"Error during native transcription: {e}\nTraceback: {traceback.format_exc()}")
             return []
 
     def _preprocess_audio(self, audio_data: AudioData) -> torch.Tensor:
@@ -289,11 +458,13 @@ class WhisperASR(BaseASR, LoggerMixin):
         return input_features
 
     def _transcribe_single_pass(
+    
         self,
         audio_features: torch.Tensor,
         forced_decoder_ids: list,
         progress_callback: Optional[Callable[[float], None]] = None,
     ) -> List[SubtitleSegment]:
+        self.logger.debug("[ASR] Entered _transcribe_single_pass")
         """Transcribe audio in a single pass for short audio (≤30s).
 
         Args:
@@ -425,6 +596,7 @@ class WhisperASR(BaseASR, LoggerMixin):
     def _decode_tokens_to_segments(
         self, generated_ids: torch.Tensor
     ) -> List[SubtitleSegment]:
+        self.logger.debug("[ASR] Entered _decode_tokens_to_segments")
         """Decode generated tokens to subtitle segments.
 
         Args:
@@ -434,23 +606,26 @@ class WhisperASR(BaseASR, LoggerMixin):
             List of subtitle segments
         """
         segments = []
-
         try:
             # Skip the initial special tokens (bos, language, task)
             # Whisper uses: [bos_token, language_token, task_token, ...]
             skip_tokens = 3
             new_tokens = generated_ids[0, skip_tokens:]
 
+            self.logger.debug(f"[ASR] Decoding tokens: {new_tokens.tolist()}")
+
             # Decode tokens with timestamps if enabled
             if self.return_timestamps:
                 # Use Whisper's timestamp decoding
                 decoded = self.tokenizer.decode(new_tokens, skip_special_tokens=False)
+                self.logger.debug(f"[ASR] Decoded text (with timestamps): '{decoded}'")
                 segments = self._parse_whisper_timestamps(decoded)
             else:
                 # Simple text decoding without timestamps
                 decoded_text = self.tokenizer.decode(
                     new_tokens, skip_special_tokens=True
                 )
+                self.logger.debug(f"[ASR] Decoded text (no timestamps): '{decoded_text}'")
 
                 if decoded_text.strip():
                     segment = SubtitleSegment(
@@ -460,14 +635,21 @@ class WhisperASR(BaseASR, LoggerMixin):
                         confidence=None,
                     )
                     segments.append(segment)
+                    self.logger.debug(f"[ASR] Created segment: {segment}")
                 else:
                     self.logger.warning("Decoded text is empty or whitespace only")
-
+            # Defensive: check for ambiguous truth value in segments
+            try:
+                for idx, seg in enumerate(segments):
+                    if isinstance(seg, np.ndarray):
+                        self.logger.error(f"[ASR] _decode_tokens_to_segments: Segment {idx} is a numpy array, which is invalid. Segment: {seg}")
+            except Exception as e:
+                import traceback
+                self.logger.error(f"[ASR] Exception while iterating segments in _decode_tokens_to_segments: {e}\n{traceback.format_exc()}")
+            self.logger.debug(f"[ASR] Returning segments from _decode_tokens_to_segments: {segments}")
         except Exception as e:
-            self.logger.error(f"Error decoding tokens to segments: {e}")
             import traceback
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-
+            self.logger.error(f"Error decoding tokens to segments: {e}\nTraceback: {traceback.format_exc()}")
         return segments
 
     def _parse_whisper_timestamps(self, decoded_text: str) -> List[SubtitleSegment]:
@@ -551,10 +733,17 @@ class WhisperASR(BaseASR, LoggerMixin):
                     confidence=None,
                 )
                 segments.append(segment)
-
+            # Defensive: check for ambiguous truth value in segments
+            try:
+                for idx, seg in enumerate(segments):
+                    if isinstance(seg, np.ndarray):
+                        self.logger.error(f"[ASR] _parse_whisper_timestamps: Segment {idx} is a numpy array, which is invalid. Segment: {seg}")
+            except Exception as e:
+                import traceback
+                self.logger.error(f"[ASR] Exception while iterating segments in _parse_whisper_timestamps: {e}\n{traceback.format_exc()}")
         except Exception as e:
-            self.logger.error(f"Error parsing Whisper timestamps: {e}")
-
+            import traceback
+            self.logger.error(f"Error parsing Whisper timestamps: {e}\nTraceback: {traceback.format_exc()}")
         return segments
 
     def transcribe_batch(

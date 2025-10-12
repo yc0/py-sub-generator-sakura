@@ -24,8 +24,8 @@
   },
   "sakura": {
     "enabled": true,
-    "model_name": "SakuraLLM/Sakura-7B-Qwen2.5-v1.0-GGUF",
-    "model_file": "sakura-7b-qwen2.5-v1.0-iq4xs.gguf",
+    "model_name": "SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF",
+    "model_file": "sakura-14b-qwen2.5-v1.0-iq4xs.gguf",
     "device": "auto",
     "context_length": 8192,
     "max_new_tokens": 512,
