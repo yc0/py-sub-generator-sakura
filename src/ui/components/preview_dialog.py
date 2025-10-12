@@ -362,7 +362,7 @@ class PreviewDialog:
             file_path = filedialog.asksaveasfilename(
                 title="Export Preview",
                 defaultextension=default_ext,
-                initialname=default_name,
+                initialfile=default_name,
                 filetypes=filetypes,
             )
 

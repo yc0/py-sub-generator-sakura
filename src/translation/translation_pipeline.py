@@ -36,7 +36,7 @@ class TranslationPipeline(LoggerMixin):
     def _initialize_translators(self):
         """Initialize translation models based on configuration."""
         try:
-            # Check if SakuraLLM is enabled
+            # Initialize SakuraLLM if enabled
             if self.config.is_sakura_enabled():
                 self.logger.info("🌸 Initializing SakuraLLM translator")
                 self.sakura_translator = SakuraTranslator.create_from_config(
@@ -45,20 +45,21 @@ class TranslationPipeline(LoggerMixin):
                 self.logger.info(
                     "🌸 SakuraLLM translator initialized for Japanese→Chinese"
                 )
-            else:
-                self.logger.info("Initializing standard multi-stage translator")
-                self.multi_stage_translator = MultiStageTranslator(
-                    ja_en_model=self.translation_config.get(
-                        "ja_to_en_model", "Helsinki-NLP/opus-mt-ja-en"
-                    ),
-                    en_zh_model=self.translation_config.get(
-                        "en_to_zh_model", "Helsinki-NLP/opus-mt-en-zh"
-                    ),
-                    device=self.translation_config.get("device", "auto"),
-                    batch_size=self.translation_config.get("batch_size", 8),
-                    max_length=self.translation_config.get("max_length", 512),
-                )
-                self.logger.info("Standard translation pipeline initialized")
+            
+            # Always initialize standard multi-stage translator for comprehensive language support
+            self.logger.info("Initializing standard multi-stage translator")
+            self.multi_stage_translator = MultiStageTranslator(
+                ja_en_model=self.translation_config.get(
+                    "ja_to_en_model", "Helsinki-NLP/opus-mt-ja-en"
+                ),
+                en_zh_model=self.translation_config.get(
+                    "en_to_zh_model", "Helsinki-NLP/opus-mt-en-zh"
+                ),
+                device=self.translation_config.get("device", "auto"),
+                batch_size=self.translation_config.get("batch_size", 8),
+                max_length=self.translation_config.get("max_length", 512),
+            )
+            self.logger.info("Standard translation pipeline initialized")
 
         except Exception as e:
             self.logger.error(f"Error initializing translation pipeline: {e}")
@@ -69,22 +70,32 @@ class TranslationPipeline(LoggerMixin):
         """Load all translation models.
 
         Returns:
-            True if successful, False otherwise
+            True if at least one translator loaded successfully
         """
         if self.sakura_translator is None and self.multi_stage_translator is None:
             self._initialize_translators()
 
+        success = False
+        
         # Load SakuraLLM if enabled
         if self.sakura_translator:
             self.logger.info("🌸 Loading SakuraLLM model...")
-            return self.sakura_translator.load_model()
+            if self.sakura_translator.load_model():
+                success = True
+                self.logger.info("🌸 SakuraLLM model loaded successfully")
+            else:
+                self.logger.error("Failed to load SakuraLLM model")
 
-        # Load standard translator if SakuraLLM not enabled
+        # Load standard translator
         if self.multi_stage_translator:
             self.logger.info("Loading standard translation models...")
-            return self.multi_stage_translator.load_models()
+            if self.multi_stage_translator.load_models():
+                success = True
+                self.logger.info("Standard translation models loaded successfully")
+            else:
+                self.logger.error("Failed to load standard translation models")
 
-        return False
+        return success
 
     def translate_subtitle_file(
         self,
@@ -153,8 +164,8 @@ class TranslationPipeline(LoggerMixin):
                         zh_hant_result = TranslationResult(
                             original_text=result.original_text,
                             translated_text=traditional_text,
-                            source_lang=result.source_lang,
-                            target_lang="zh-Hant",  # Mark as Traditional Chinese
+                            source_language=result.source_language,
+                            target_language="zh-Hant",  # Mark as Traditional Chinese
                             confidence=result.confidence,
                         )
                         zh_hant_results.append(zh_hant_result)
@@ -165,23 +176,22 @@ class TranslationPipeline(LoggerMixin):
                     translation_results["zh"] = zh_hant_results
                     self.logger.info(f"✅ SakuraLLM pipeline completed: {len(zh_hant_results)} translations")
 
-                # Handle English translation if requested
+                # Handle English translation if requested  
                 if "en" in target_languages:
                     self.logger.info("Japanese→English: Using standard translator alongside SakuraLLM")
                     if self.multi_stage_translator and self.multi_stage_translator.load_models():
-                        en_results = self.multi_stage_translator.translate_to_language(texts, "en")
-                        translation_results["en"] = en_results
+                        # MultiStageTranslator translates to both EN and ZH
+                        multi_results = self.multi_stage_translator.translate_to_both(texts, progress_callback)
+                        translation_results["en"] = multi_results.get("en", [])
+                        # Only use ZH from multi-stage if SakuraLLM didn't handle it
+                        if "zh" not in translation_results:
+                            translation_results["zh"] = multi_results.get("zh", [])
                     else:
                         self.logger.warning("Standard translator not available for English translation")
                         translation_results["en"] = []
 
                 if not translation_results:
-                    self.logger.warning("No target languages supported by SakuraLLM pipeline")
-                else:
-                    self.logger.warning(
-                        "SakuraLLM only supports Japanese→Chinese. Skipping other languages."
-                    )
-                    translation_results = {}
+                    self.logger.warning("No supported target languages in translation results")
             else:
                 # Use standard multi-stage translator
                 translation_results = self.multi_stage_translator.translate_to_both(
