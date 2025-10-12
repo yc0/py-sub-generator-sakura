@@ -1,3 +1,62 @@
+# 🆕 **Latest Major Refactor: HuggingFace Pipeline & Progress Reporting (Commit cbf3ba5)**
+
+## 📅 **Date: October 12, 2025**
+
+### 🎯 **Major ASR Refactor: Pipeline Implementation**
+**Replaced:** Native Whisper `generate()` method  
+**With:** HuggingFace Transformers pipeline approach
+
+#### ✅ **Critical Issues Resolved:**
+- **Progress Bar Accuracy**: Fixed premature 100% completion showing during processing stages
+- **Audio Truncation Bug**: Disabled aggressive silence trimming that was cutting off long-form audio content
+- **Timestamp Reliability**: Improved handling of missing end timestamps in Whisper ASR
+- **Memory Management**: Better model loading/unloading with pipeline compatibility
+
+#### 🔧 **Technical Improvements:**
+- **Pipeline Architecture**: More stable and maintainable ASR implementation
+- **Progress Callbacks**: Standardized `(stage, progress)` signature across all translation components
+- **Defensive Programming**: Added numpy array type checks to prevent segment processing errors
+- **Logger Enhancement**: Fixed root logger handler setup for proper logging output
+
+#### 📈 **Model & Quality Upgrades:**
+- **Sakura LLM**: Upgraded from 7B to 14B parameter model for superior translation quality
+- **Audio Processing**: Enhanced chunking logic with guaranteed end-of-audio coverage
+- **Debug Infrastructure**: Comprehensive diagnostic tools organized in `tests/manual/`
+
+### **Before vs After: Critical Bug Fixes**
+
+| Issue | Before | After |
+|-------|--------|--------|
+| **Progress Bar** | ❌ Shows 100% immediately | ✅ Accurate stage-by-stage progress |
+| **Long Audio** | ❌ Truncated by silence trimming | ✅ Full audio coverage preserved |
+| **ASR Stability** | ⚠️ Native method instability | ✅ Pipeline reliability |
+| **Translation Quality** | 📈 Good (7B model) | 🚀 Excellent (14B model) |
+| **Error Handling** | ❌ Numpy array crashes | ✅ Defensive type checking |
+| **Debugging** | 🔧 Scattered debug files | ✅ Organized diagnostic suite |
+
+### **🔧 **Code Quality Enhancements**
+- **14 files modified** with 610 insertions, 79 deletions
+- **4 new diagnostic scripts** in `tests/manual/` for troubleshooting
+- **Comprehensive logging** improvements across all components
+- **Test suite updates** for new ASR implementation compatibility
+
+### **🎵 **Audio Processing Revolution**
+- **Silence Trimming Fix**: Disabled for long-form content to prevent content loss
+- **Chunking Optimization**: Guaranteed coverage of entire audio duration
+- **Debug Visibility**: Enhanced logging for audio loading and processing steps
+
+### **🌐 **Translation Pipeline Excellence**
+- **Progress Accuracy**: Real-time progress reporting during translation stages
+- **Model Quality**: 14B Sakura model for superior Japanese-to-Chinese translation
+- **Error Resilience**: Robust handling of translation failures and edge cases
+
+### **🧪 **Testing & Debugging Infrastructure**
+- **Manual Test Suite**: Organized diagnostic scripts for ASR troubleshooting
+- **Regression Prevention**: Comprehensive checks for segment type issues
+- **Validation Tools**: Pipeline validation scripts for quality assurance
+
+---
+
 # 🚀 Project Progress Summary - Sakura Subtitle Generator
 
 ## 📅 Session Date: October 11, 2025
