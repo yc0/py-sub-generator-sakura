@@ -83,6 +83,7 @@ class Config:
             "generate_both_languages": True,
             "original_language_suffix": "_ja",
             "translated_language_suffix": "_zh",
+            "combine_languages": False,  # New option to combine all languages into single SRT
         },
         "logging": {
             "level": "INFO",
@@ -330,3 +331,7 @@ class Config:
     def get_translated_language_suffix(self) -> str:
         """Get suffix for translated language subtitle files."""
         return self.get("output.translated_language_suffix", "_zh")
+
+    def get_combine_languages(self) -> bool:
+        """Check if all languages should be combined into a single SRT file."""
+        return self.get("output.combine_languages", False)

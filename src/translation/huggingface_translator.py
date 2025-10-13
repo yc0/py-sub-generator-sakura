@@ -78,6 +78,92 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
 
         return nllb_codes.get(lang_code, lang_code)
 
+    def _split_long_text(self, text: str, max_tokens: int = 400) -> List[str]:
+        """Split long text into smaller chunks to avoid token limit issues.
+        
+        Args:
+            text: Text to split
+            max_tokens: Maximum tokens per chunk (leave room below model's limit)
+            
+        Returns:
+            List of text chunks
+        """
+        if not text.strip():
+            return [text]
+        
+        # For translation models, we need to be conservative with token limits
+        # Most OPUS-MT models have max 512 tokens, so we use 400 to be safe
+        
+        # Simple sentence-based splitting first
+        import re
+        sentences = re.split(r'([。！？.!?])', text)
+        
+        chunks = []
+        current_chunk = ""
+        
+        for i in range(0, len(sentences), 2):
+            sentence = sentences[i]
+            if i + 1 < len(sentences):
+                sentence += sentences[i + 1]  # Add punctuation back
+            
+            # Check if adding this sentence would exceed our limit
+            test_chunk = current_chunk + sentence
+            if self._estimate_token_count(test_chunk) > max_tokens and current_chunk:
+                # Start a new chunk
+                chunks.append(current_chunk.strip())
+                current_chunk = sentence
+            else:
+                current_chunk += sentence
+        
+        # Add the last chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+        
+        # If we still have very long chunks, split by words
+        final_chunks = []
+        for chunk in chunks:
+            if self._estimate_token_count(chunk) > max_tokens:
+                # Split by spaces or characters
+                words = chunk.split()
+                temp_chunk = ""
+                for word in words:
+                    if self._estimate_token_count(temp_chunk + " " + word) > max_tokens and temp_chunk:
+                        final_chunks.append(temp_chunk.strip())
+                        temp_chunk = word
+                    else:
+                        temp_chunk += " " + word if temp_chunk else word
+                
+                if temp_chunk.strip():
+                    final_chunks.append(temp_chunk.strip())
+            else:
+                final_chunks.append(chunk)
+        
+        return final_chunks if final_chunks else [text]
+
+    def _estimate_token_count(self, text: str) -> int:
+        """Estimate token count for a text string.
+        
+        Args:
+            text: Text to count tokens for
+            
+        Returns:
+            Estimated token count
+        """
+        if not text:
+            return 0
+        
+        # Rough estimation: 1 token per 4 characters for most languages
+        # This is conservative and works for Japanese/Chinese/English
+        char_count = len(text)
+        estimated_tokens = max(1, char_count // 4)
+        
+        # For CJK languages, characters are often 1:1 with tokens
+        # Count CJK characters
+        cjk_chars = sum(1 for char in text if '\u4e00' <= char <= '\u9fff' or '\u3040' <= char <= '\u309f' or '\u30a0' <= char <= '\u30ff')
+        estimated_tokens = max(estimated_tokens, cjk_chars)
+        
+        return estimated_tokens
+
     def load_model(self) -> bool:
         """Load translation model using transformers pipeline.
 
@@ -237,7 +323,7 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                         original_text=text,
                         translated_text=text,
                         source_language=self.source_lang,
-                        target_language=self.target_lang,
+                        target_lang=self.target_lang,
                         confidence=0.0,
                         translation_model=self.model_name,
                     )
@@ -252,16 +338,28 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
             for i in range(0, total_texts, self.batch_size):
                 batch_texts = texts[i : i + self.batch_size]
 
-                # Preprocess batch
-                processed_texts = [self._preprocess_text(text) for text in batch_texts]
+                # Split long texts into chunks to avoid token limit issues
+                chunked_batch = []
+                chunk_mapping = []  # Track which original text each chunk belongs to
+                
+                for text_idx, text in enumerate(batch_texts):
+                    chunks = self._split_long_text(text)
+                    chunked_batch.extend(chunks)
+                    chunk_mapping.extend([(text_idx, len(chunks))] * len(chunks))
+
+                # Preprocess chunks
+                processed_texts = [self._preprocess_text(text) for text in chunked_batch]
 
                 # Filter out empty texts
                 non_empty_indices = []
                 non_empty_texts = []
-                for j, text in enumerate(processed_texts):
+                non_empty_mapping = []
+                
+                for j, (text, mapping) in enumerate(zip(processed_texts, chunk_mapping)):
                     if text.strip():
                         non_empty_indices.append(j)
                         non_empty_texts.append(text)
+                        non_empty_mapping.append(mapping)
 
                 # Translate non-empty texts
                 if non_empty_texts:
@@ -276,30 +374,33 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                 else:
                     batch_results = []
 
-                # Process results for this batch
-                batch_translation_results = []
+                # Reassemble chunks back into original texts
+                batch_translation_results = [[] for _ in range(len(batch_texts))]
                 result_idx = 0
-
-                for j, original_text in enumerate(batch_texts):
-                    if j in non_empty_indices and result_idx < len(batch_results):
-                        # Get translation from results
-                        result = batch_results[result_idx]
-                        if isinstance(result, dict):
-                            translated_text = result.get(
-                                "translation_text", original_text
-                            )
-                        else:
-                            translated_text = str(result)
-
-                        translated_text = self._postprocess_text(translated_text)
-                        result_idx += 1
+                
+                for mapping in non_empty_mapping:
+                    text_idx, num_chunks = mapping
+                    chunks_for_text = []
+                    for _ in range(num_chunks):
+                        if result_idx < len(batch_results):
+                            result = batch_results[result_idx]
+                            if isinstance(result, dict):
+                                translated_text = result.get("translation_text", "")
+                            else:
+                                translated_text = str(result)
+                            chunks_for_text.append(self._postprocess_text(translated_text))
+                            result_idx += 1
+                    
+                    # Join chunks for this text
+                    if chunks_for_text:
+                        combined_translation = " ".join(chunks_for_text)
+                        batch_translation_results[text_idx] = combined_translation
                     else:
-                        # Empty or failed translation
-                        translated_text = (
-                            "" if not processed_texts[j].strip() else original_text
-                        )
+                        batch_translation_results[text_idx] = batch_texts[text_idx]
 
-                    batch_translation_results.append(
+                # Create TranslationResult objects
+                for j, (original_text, translated_text) in enumerate(zip(batch_texts, batch_translation_results)):
+                    results.append(
                         TranslationResult(
                             original_text=original_text,
                             translated_text=translated_text,
@@ -309,8 +410,6 @@ class HuggingFaceTranslator(BaseTranslator, LoggerMixin):
                             translation_model=self.model_name,
                         )
                     )
-
-                results.extend(batch_translation_results)
 
                 # Update progress
                 if progress_callback:

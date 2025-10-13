@@ -295,6 +295,7 @@ class TranslationPipeline(LoggerMixin):
 
         output_files = {}
         generate_both = self.config.get_generate_both_languages()
+        combine_languages = self.config.get_combine_languages()
         original_suffix = self.config.get_original_language_suffix()
         translated_suffix = self.config.get_translated_language_suffix()
 
@@ -307,6 +308,26 @@ class TranslationPipeline(LoggerMixin):
                 if subtitle_file.video_file
                 else "subtitles"
             )
+
+            # If combine_languages is enabled, create a single combined file
+            if combine_languages:
+                for fmt in formats:
+                    if fmt == "srt":
+                        combined_content = subtitle_file.export_srt(combine_languages=True)
+                        
+                        # Create filename with all language codes
+                        lang_codes = ["en", "jp", "zh"]  # Default order: English, Japanese, Chinese
+                        lang_suffix = "_".join(lang_codes)
+                        combined_file = output_dir / f"{base_name}_{lang_suffix}.srt"
+
+                        with open(combined_file, "w", encoding="utf-8") as f:
+                            f.write(combined_content)
+
+                        output_files[f"combined_{fmt}"] = combined_file
+                        self.logger.info(f"Exported combined multi-language subtitles: {combined_file}")
+                
+                # Return early if only combined output is requested
+                return output_files
 
             # Export original (Japanese) if user wants both languages
             if generate_both:

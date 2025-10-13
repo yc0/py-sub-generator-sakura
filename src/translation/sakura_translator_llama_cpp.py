@@ -173,28 +173,31 @@ class SakuraTranslator(BaseTranslator):
             progress_callback("translation", 0.0)
 
         try:
-            # Create SakuraLLM prompt
-            prompt = self._create_translation_prompt(text)
-
-            if progress_callback:
-                progress_callback("translation", 0.3)
-
-            # Generate translation
-            response = self.llm(
-                prompt,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-                top_p=self.top_p,
-                repeat_penalty=self.repetition_penalty,
-                stop=["<|im_end|>", "\n\n"],  # Stop tokens
-                echo=False  # Don't include prompt in response
-            )
+            # Check if text is too long and split if necessary
+            max_input_tokens = min(self.context_length - self.max_tokens - 100, 4000)  # Leave room for output and prompt
+            if self._estimate_token_count(text) > max_input_tokens:
+                # Split long text into chunks
+                chunks = self._split_long_text(text, max_tokens=max_input_tokens)
+                translated_chunks = []
+                
+                for i, chunk in enumerate(chunks):
+                    if progress_callback:
+                        chunk_progress = 0.3 + (i / len(chunks)) * 0.5
+                        progress_callback("translation", chunk_progress)
+                    
+                    chunk_result = self._translate_single_chunk(chunk)
+                    translated_chunks.append(chunk_result)
+                
+                translated_text = " ".join(translated_chunks)
+            else:
+                # Translate as single chunk
+                if progress_callback:
+                    progress_callback("translation", 0.3)
+                
+                translated_text = self._translate_single_chunk(text)
 
             if progress_callback:
                 progress_callback("translation", 0.8)
-
-            # Extract translated text
-            translated_text = response["choices"][0]["text"].strip()
 
             # Clean up the response
             translated_text = self._clean_translation(translated_text)
@@ -351,6 +354,113 @@ class SakuraTranslator(BaseTranslator):
                 "performance": "maximum_quality"
             }
         }
+
+    def _split_long_text(self, text: str, max_tokens: int = 4000) -> list:
+        """Split long text into smaller chunks to avoid token limit issues.
+        
+        Args:
+            text: Text to split
+            max_tokens: Maximum tokens per chunk
+            
+        Returns:
+            List of text chunks
+        """
+        if not text.strip():
+            return [text]
+        
+        # Simple sentence-based splitting first
+        import re
+        sentences = re.split(r'([。！？.!?])', text)
+        
+        chunks = []
+        current_chunk = ""
+        
+        for i in range(0, len(sentences), 2):
+            sentence = sentences[i]
+            if i + 1 < len(sentences):
+                sentence += sentences[i + 1]  # Add punctuation back
+            
+            # Check if adding this sentence would exceed our limit
+            test_chunk = current_chunk + sentence
+            if self._estimate_token_count(test_chunk) > max_tokens and current_chunk:
+                # Start a new chunk
+                chunks.append(current_chunk.strip())
+                current_chunk = sentence
+            else:
+                current_chunk += sentence
+        
+        # Add the last chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+        
+        # If we still have very long chunks, split by words
+        final_chunks = []
+        for chunk in chunks:
+            if self._estimate_token_count(chunk) > max_tokens:
+                # Split by spaces or characters
+                words = chunk.split()
+                temp_chunk = ""
+                for word in words:
+                    if self._estimate_token_count(temp_chunk + " " + word) > max_tokens and temp_chunk:
+                        final_chunks.append(temp_chunk.strip())
+                        temp_chunk = word
+                    else:
+                        temp_chunk += " " + word if temp_chunk else word
+                
+                if temp_chunk.strip():
+                    final_chunks.append(temp_chunk.strip())
+            else:
+                final_chunks.append(chunk)
+        
+        return final_chunks if final_chunks else [text]
+
+    def _estimate_token_count(self, text: str) -> int:
+        """Estimate token count for a text string.
+        
+        Args:
+            text: Text to count tokens for
+            
+        Returns:
+            Estimated token count
+        """
+        if not text:
+            return 0
+        
+        # Rough estimation: 1 token per 4 characters for most languages
+        char_count = len(text)
+        estimated_tokens = max(1, char_count // 4)
+        
+        # For CJK languages, characters are often 1:1 with tokens
+        cjk_chars = sum(1 for char in text if '\u4e00' <= char <= '\u9fff' or '\u3040' <= char <= '\u309f' or '\u30a0' <= char <= '\u30ff')
+        estimated_tokens = max(estimated_tokens, cjk_chars)
+        
+        return estimated_tokens
+
+    def _translate_single_chunk(self, text: str) -> str:
+        """Translate a single chunk of text.
+        
+        Args:
+            text: Text chunk to translate
+            
+        Returns:
+            Translated text
+        """
+        # Create SakuraLLM prompt
+        prompt = self._create_translation_prompt(text)
+
+        # Generate translation
+        response = self.llm(
+            prompt,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            repeat_penalty=self.repetition_penalty,
+            stop=["<|im_end|>", "\n\n"],  # Stop tokens
+            echo=False  # Don't include prompt in response
+        )
+
+        # Extract translated text
+        return response["choices"][0]["text"].strip()
 
     @classmethod
     def create_from_config(cls, config: Config, model_key: Optional[str] = None) -> "SakuraTranslator":

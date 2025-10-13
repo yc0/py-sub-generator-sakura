@@ -65,15 +65,15 @@ class WhisperASR(LoggerMixin):
             lang = language or self.language
             # Use pipeline to get segments with timestamps
             self.logger.debug(f"[WhisperASR] Transcribing audio of duration {audio_data.duration:.2f}s with language={lang}")
-            if progress_callback:
-                progress_callback("asr", 0.0)
+            # if progress_callback:
+            #     progress_callback("asr", 0.0)
             result = self.pipe(
                 tmp.name,
                 generate_kwargs={"language": lang, "return_timestamps": True}
             )
             self.logger.debug(f"[WhisperASR] Pipeline output: {result}")
-            if progress_callback:
-                progress_callback("asr", 1.0)
+            # if progress_callback:
+            #     progress_callback("asr", 1.0)
             segments = []
             # Try to extract timestamps from result['chunks'] if available
             if isinstance(result, dict) and "chunks" in result and result["chunks"]:

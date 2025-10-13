@@ -594,6 +594,25 @@ class SettingsDialog:
         )
         info_label.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
 
+        # Multi-language combination option
+        self.combine_languages_var = tk.BooleanVar()
+        combine_lang_check = ttk.Checkbutton(
+            frame,
+            text="Combine all languages into a single SRT file",
+            variable=self.combine_languages_var,
+        )
+        combine_lang_check.grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=5)
+
+        # Info label for multi-language combination feature
+        combine_info_label = ttk.Label(
+            frame,
+            text="💡 When enabled, creates one file with all languages combined\n"
+                 "   Example: video_en_jp_zh.srt (English, Japanese, Chinese)",
+            foreground="green",
+            font=("TkDefaultFont", 8),
+        )
+        combine_info_label.grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+
         # Language suffix customization (initially hidden)
         self.suffix_frame = ttk.LabelFrame(frame, text="File Naming Options", padding="5")
 
@@ -667,7 +686,7 @@ class SettingsDialog:
         """Handle dual language checkbox toggle."""
         if self.generate_both_var.get():
             # Show suffix configuration options
-            self.suffix_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
+            self.suffix_frame.grid(row=9, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
         else:
             # Hide suffix configuration options
             self.suffix_frame.grid_remove()
@@ -735,6 +754,9 @@ class SettingsDialog:
             self.original_suffix_var.set(output_config.get("original_language_suffix", "_ja"))
             self.translated_suffix_var.set(output_config.get("translated_language_suffix", "_zh"))
 
+            # Multi-language combination setting
+            self.combine_languages_var.set(output_config.get("combine_languages", False))
+
             # Trigger toggle to show/hide suffix options
             self._on_dual_language_toggle()
 
@@ -801,6 +823,9 @@ class SettingsDialog:
             self.config.set("output.generate_both_languages", self.generate_both_var.get())
             self.config.set("output.original_language_suffix", self.original_suffix_var.get())
             self.config.set("output.translated_language_suffix", self.translated_suffix_var.get())
+
+            # Multi-language combination setting
+            self.config.set("output.combine_languages", self.combine_languages_var.get())
 
             # UI settings
             self.config.set("ui.window_size", self.window_size_var.get())
