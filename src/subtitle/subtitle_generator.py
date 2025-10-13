@@ -222,13 +222,13 @@ class SubtitleGenerator(LoggerMixin):
                 return []
 
             # Check if we need to split audio into chunks
-            chunk_length = self.config.get("asr.chunk_length", 30)  # seconds
-            overlap = self.config.get("asr.overlap", 1.0)  # seconds
+            chunk_length = self.config.get("asr.chunk_length", 8)  # Reduced for Japanese content
+            overlap = self.config.get("asr.overlap", 0.5)  # Reduced overlap
 
             if (
                 audio_data.duration > chunk_length * 1.5
             ):  # Use chunking for longer audio
-                self.logger.info("Using chunked ASR for long audio")
+                self.logger.info(f"Using chunked ASR: {chunk_length}s chunks with {overlap}s overlap")
 
                 # Split audio into chunks
                 audio_chunks = self.audio_processor.split_audio_chunks(
@@ -249,6 +249,9 @@ class SubtitleGenerator(LoggerMixin):
                     progress_callback=progress_callback,
                 )
 
+            # Post-process segments for better subtitle readability
+            segments = self._post_process_subtitle_segments(segments)
+
             self.logger.info(f"ASR completed: {len(segments)} segments generated")
             return segments
 
@@ -259,6 +262,134 @@ class SubtitleGenerator(LoggerMixin):
         finally:
             # Unload ASR model to free memory
             self.asr.unload_model()
+
+    def _post_process_subtitle_segments(
+        self, segments: List[SubtitleSegment]
+    ) -> List[SubtitleSegment]:
+        """Post-process subtitle segments for better readability and timing.
+
+        Args:
+            segments: Raw subtitle segments from ASR
+
+        Returns:
+            Processed subtitle segments with improved timing and readability
+        """
+        if not segments:
+            return segments
+
+        processed_segments = []
+        max_subtitle_length = self.config.get("asr.max_subtitle_length", 25)  # Max characters per subtitle
+        subtitle_display_duration = self.config.get("asr.subtitle_display_duration", 2.5)  # Max display time in seconds
+
+        for segment in segments:
+            # Skip segments that are too short or empty
+            if not segment.text or not segment.text.strip():
+                continue
+
+            text = segment.text.strip()
+            start_time = segment.start_time
+            end_time = segment.end_time
+            duration = end_time - start_time
+
+            # If segment is too long in text or duration, split it
+            if len(text) > max_subtitle_length or duration > subtitle_display_duration:
+                # Calculate how many parts we need
+                text_parts = self._split_text_by_length(text, max_subtitle_length)
+                time_parts = self._split_time_by_duration(start_time, end_time, len(text_parts))
+
+                # Create new segments for each part
+                for i, (text_part, (part_start, part_end)) in enumerate(zip(text_parts, time_parts)):
+                    processed_segments.append(SubtitleSegment(
+                        start_time=part_start,
+                        end_time=part_end,
+                        text=text_part,
+                        confidence=segment.confidence if hasattr(segment, 'confidence') else 1.0
+                    ))
+            else:
+                # Segment is fine as-is, but ensure minimum display time
+                min_display_time = 1.0  # Minimum 1 second display
+                if duration < min_display_time:
+                    # Extend the end time slightly, but don't overlap with next segment
+                    extended_end = min(start_time + min_display_time, end_time + 0.5)
+                    segment.end_time = extended_end
+
+                processed_segments.append(segment)
+
+        # Sort segments by start time
+        processed_segments.sort(key=lambda x: x.start_time)
+
+        self.logger.info(f"Post-processed {len(segments)} segments into {len(processed_segments)} readable subtitles")
+        return processed_segments
+
+    def _split_text_by_length(self, text: str, max_length: int) -> List[str]:
+        """Split text into parts that don't exceed max_length characters.
+
+        Args:
+            text: Text to split
+            max_length: Maximum characters per part
+
+        Returns:
+            List of text parts
+        """
+        if len(text) <= max_length:
+            return [text]
+
+        words = text.split()
+        parts = []
+        current_part = ""
+
+        for word in words:
+            # Check if adding this word would exceed the limit
+            if len(current_part) + len(word) + 1 > max_length:  # +1 for space
+                if current_part:
+                    parts.append(current_part.strip())
+                    current_part = word
+                else:
+                    # Word itself is too long, split it
+                    parts.append(word[:max_length])
+                    remaining = word[max_length:]
+                    if remaining:
+                        current_part = remaining
+            else:
+                if current_part:
+                    current_part += " " + word
+                else:
+                    current_part = word
+
+        if current_part:
+            parts.append(current_part.strip())
+
+        return parts if parts else [text]
+
+    def _split_time_by_duration(
+        self, start_time: float, end_time: float, num_parts: int
+    ) -> List[tuple[float, float]]:
+        """Split time duration into equal parts.
+
+        Args:
+            start_time: Start time of the segment
+            end_time: End time of the segment
+            num_parts: Number of parts to split into
+
+        Returns:
+            List of (start, end) time tuples
+        """
+        if num_parts <= 1:
+            return [(start_time, end_time)]
+
+        total_duration = end_time - start_time
+        part_duration = total_duration / num_parts
+
+        time_parts = []
+        current_time = start_time
+
+        for i in range(num_parts):
+            part_start = current_time
+            part_end = min(current_time + part_duration, end_time)
+            time_parts.append((part_start, part_end))
+            current_time = part_end
+
+        return time_parts
 
     def export_subtitles(
         self, subtitle_file: SubtitleFile, output_dir: Path, formats: List[str] = None

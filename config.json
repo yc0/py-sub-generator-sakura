@@ -5,7 +5,10 @@
     "batch_size": 1,
     "language": "ja",
     "return_timestamps": true,
-    "chunk_length": 30,
+    "chunk_length": 8,
+    "overlap": 0.5,
+    "max_subtitle_length": 25,
+    "subtitle_display_duration": 2.5,
     "alternative_models": {
       "kotoba_v2.1_best": "kotoba-tech/kotoba-whisper-v2.1",
       "kotoba_v2.0_alias_all": "kotoba-tech/kotoba-whisper-v2.0",

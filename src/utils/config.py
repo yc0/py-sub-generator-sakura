@@ -27,7 +27,10 @@ class Config:
             "batch_size": 1,
             "language": "ja",  # Japanese
             "return_timestamps": True,
-            "chunk_length": 30,  # seconds (native Whisper optimal window)
+            "chunk_length": 8,  # Reduced from 30s to 8s for Japanese content (better subtitle timing)
+            "overlap": 0.5,  # Reduced overlap for cleaner subtitle transitions
+            "max_subtitle_length": 25,  # Maximum characters per subtitle segment
+            "subtitle_display_duration": 2.5,  # Minimum display time in seconds
         },
         "translation": {
             "ja_to_en_model": "Helsinki-NLP/opus-mt-ja-en",
