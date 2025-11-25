@@ -3,13 +3,14 @@
 from typing import Callable, List, Optional
 
 import numpy as np
+import re
 import torch
 
 from ..models.subtitle_data import SubtitleSegment
 from ..models.video_data import AudioData
 from ..utils.logger import LoggerMixin
 from .base_asr import BaseASR
-from transformers import pipeline
+from transformers import WhisperTimeStampLogitsProcessor, pipeline
 
 class WhisperASR(LoggerMixin):
     def unload_model(self):
@@ -20,37 +21,46 @@ class WhisperASR(LoggerMixin):
         """Transcribe a list of AudioData chunks, returning one segment per chunk (real or empty), preserving chunk count and order."""
         all_segments = []
         time_offset = 0.0
+        total_chunks = len(audio_chunks)
         for idx, audio_data in enumerate(audio_chunks):
+            chunk_start = getattr(audio_data, "start_time", time_offset)
             segments = self.transcribe_audio(audio_data, language=language, progress_callback=progress_callback)
+            self.logger.debug(
+                f"Chunk {idx}: start_time={chunk_start:.2f}s duration={audio_data.duration:.2f}s segments={len(segments)}"
+            )
             # If speech detected, merge all text in this chunk into one segment
             if segments:
                 merged_text = " ".join([seg.text for seg in segments if seg.text])
+                if not merged_text.strip():
+                    pass
                 # Use the earliest start and latest end among all segments
                 start = min(seg.start_time for seg in segments)
                 end = max(seg.end_time for seg in segments)
-                all_segments.append(
-                    SubtitleSegment(
-                        start_time=time_offset + start,
-                        end_time=time_offset + end,
-                        text=merged_text,
-                        confidence=None,
-                        speaker_id=None
-                    )
+                candidate = SubtitleSegment(
+                    start_time=chunk_start + start,
+                    end_time=chunk_start + end,
+                    text=merged_text,
+                    confidence=None,
+                    speaker_id=None,
                 )
+                if merged_text.strip() and not self._is_duplicate_segment(
+                    all_segments, candidate
+                ):
+                    all_segments.append(candidate)
             else:
                 # No speech: insert empty segment for this chunk's window
                 all_segments.append(
                     SubtitleSegment(
-                        start_time=time_offset,
-                        end_time=time_offset + audio_data.duration,
+                        start_time=chunk_start,
+                        end_time=chunk_start + audio_data.duration,
                         text="",
                         confidence=None,
                         speaker_id=None
                     )
                 )
-            time_offset += audio_data.duration
+            time_offset = chunk_start + audio_data.duration
             if progress_callback:
-                progress_callback("asr", (idx + 1) / len(audio_chunks))
+                progress_callback("asr", (idx + 1) / total_chunks if total_chunks else 1.0)
         return all_segments
     def load_model(self):
         """No-op for compatibility. Pipeline loads on demand."""
@@ -67,10 +77,12 @@ class WhisperASR(LoggerMixin):
             self.logger.debug(f"[WhisperASR] Transcribing audio of duration {audio_data.duration:.2f}s with language={lang}")
             # if progress_callback:
             #     progress_callback("asr", 0.0)
-            result = self.pipe(
-                tmp.name,
-                generate_kwargs={"language": lang, "return_timestamps": True}
-            )
+            generate_kwargs = {
+                "language": lang,
+                "return_timestamps": True,
+                "logits_processor": [self.timestamp_logits_processor],
+            }
+            result = self.pipe(tmp.name, generate_kwargs=generate_kwargs)
             self.logger.debug(f"[WhisperASR] Pipeline output: {result}")
             # if progress_callback:
             #     progress_callback("asr", 1.0)
@@ -106,11 +118,53 @@ class WhisperASR(LoggerMixin):
                     confidence=None
                 ))
             return segments
+
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text for duplicate comparison."""
+        if not text:
+            return ""
+        normalized = text.strip().lower()
+        normalized = re.sub(r"[\.。,，!！?？\"]", "", normalized)
+        normalized = re.sub(r"\s+", " ", normalized)
+        return normalized
+
+    def _is_duplicate_segment(
+        self, segments: List[SubtitleSegment], candidate: SubtitleSegment
+    ) -> bool:
+        """Detect if candidate is a duplicate of the last emitted segment."""
+        if not segments or not candidate.text.strip():
+            return False
+
+        last = segments[-1]
+        if not last.text.strip():
+            return False
+
+        overlap = min(last.end_time, candidate.end_time) - max(
+            last.start_time, candidate.start_time
+        )
+        normalized_last = self._normalize_text(last.text)
+        normalized_candidate = self._normalize_text(candidate.text)
+
+        return (
+            normalized_last == normalized_candidate
+            and overlap > 0
+            and abs(last.end_time - candidate.end_time) < 0.5
+        )
     """Minimal Whisper ASR using Hugging Face pipeline with hardware acceleration support."""
-    def __init__(self, model_name="openai/whisper-large-v3", device=None, language="ja"):
+    def __init__(
+        self,
+        model_name="openai/whisper-large-v3",
+        device=None,
+        language="ja",
+        return_timestamps: bool = True,
+        chunk_length_s: Optional[float] = None,
+        **pipeline_kwargs,
+    ):
         super().__init__()
         self.model_name = model_name
         self.language = language
+        self.return_timestamps = return_timestamps
+        self.chunk_length_s = chunk_length_s
         # device: 'cuda', 'mps', 'cpu', or None (auto)
         if device is None or device == "auto":
             import torch
@@ -125,13 +179,24 @@ class WhisperASR(LoggerMixin):
                 device = "cpu"
         self.device = device
         self.logger.debug(f"[WhisperASR] Using model name: {self.model_name}, device: {self.device}")
-        self.pipe = pipeline(
-            "automatic-speech-recognition",
-            model=self.model_name,
-            device=self.device,
-            return_timestamps=True,
-            # chunk_length_s=30,
-            model_kwargs={"torch_dtype": "auto"},
+        pipeline_args = {
+            "model": self.model_name,
+            "device": self.device,
+            "return_timestamps": self.return_timestamps,
+            "model_kwargs": {"torch_dtype": "auto"},
+        }
+        if self.chunk_length_s is not None:
+            pipeline_args["chunk_length_s"] = self.chunk_length_s
+        pipeline_args.update(pipeline_kwargs)
+
+        self.pipe = pipeline("automatic-speech-recognition", **pipeline_args)
+
+        forced_decoder_ids = getattr(
+            self.pipe.model.generation_config, "forced_decoder_ids", None
+        )
+        begin_index = len(forced_decoder_ids) if forced_decoder_ids else 1
+        self.timestamp_logits_processor = WhisperTimeStampLogitsProcessor(
+            self.pipe.model.generation_config, begin_index
         )
 
     def transcribe(self, audio_path: str) -> str:

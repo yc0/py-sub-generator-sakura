@@ -228,6 +228,8 @@ class SettingsDialog:
                 "openai/whisper-small",
                 "openai/whisper-medium",
                 "openai/whisper-large-v2",
+                "kotoba-tech/kotoba-whisper-v2.1",
+                "kotoba-tech/kotoba-whisper-v2.2",
                 "openai/whisper-large-v3",
             ],
             state="readonly",
@@ -259,14 +261,30 @@ class SettingsDialog:
         )
         self.asr_chunk_var = tk.IntVar()
         chunk_spin = tk.Spinbox(
-            frame, from_=10, to=60, textvariable=self.asr_chunk_var, width=10
+            frame, from_=5, to=60, textvariable=self.asr_chunk_var, width=10
         )
         chunk_spin.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+
+        # Overlap duration
+        ttk.Label(frame, text="Overlap (seconds):").grid(
+            row=4, column=0, sticky=tk.W, pady=5
+        )
+        self.asr_overlap_var = tk.DoubleVar()
+        overlap_spin = tk.Spinbox(
+            frame,
+            from_=0.0,
+            to=2.0,
+            increment=0.1,
+            format="%.1f",
+            textvariable=self.asr_overlap_var,
+            width=10,
+        )
+        overlap_spin.grid(row=4, column=1, sticky=tk.W, padx=(10, 0), pady=5)
 
         # Native Whisper info
         info_frame = ttk.Frame(frame)
         info_frame.grid(
-            row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(15, 5)
+            row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(15, 5)
         )
 
         info_label = ttk.Label(
@@ -702,6 +720,7 @@ class SettingsDialog:
             self.asr_device_var.set(asr_config.get("device", "auto"))
             self.asr_batch_var.set(asr_config.get("batch_size", 1))
             self.asr_chunk_var.set(asr_config.get("chunk_length", 30))
+            self.asr_overlap_var.set(asr_config.get("overlap", 0.5))
 
             # Translation settings
             trans_config = self.config.get_translation_config()
@@ -783,6 +802,7 @@ class SettingsDialog:
             self.config.set("asr.device", self.asr_device_var.get())
             self.config.set("asr.batch_size", self.asr_batch_var.get())
             self.config.set("asr.chunk_length", self.asr_chunk_var.get())
+            self.config.set("asr.overlap", self.asr_overlap_var.get())
 
             # Translation settings
             self.config.set("translation.ja_to_en_model", self.ja_en_model_var.get())

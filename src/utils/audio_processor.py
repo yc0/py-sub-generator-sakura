@@ -291,6 +291,7 @@ class AudioProcessor:
                 logger.info(f"Chunk {chunk_idx}: start={start}, end={end}, duration={chunk_duration_actual:.2f}s, samples={len(chunk_audio)}")
                 print(f"Chunk {chunk_idx}: start={start}, end={end}, duration={chunk_duration_actual:.2f}s, samples={len(chunk_audio)}")
 
+                chunk_start_time = start / sample_rate
                 chunks.append(
                     AudioData(
                         audio_array=chunk_audio,
@@ -298,6 +299,7 @@ class AudioProcessor:
                         duration=chunk_duration_actual,
                         channels=audio_data.channels,
                         bit_depth=audio_data.bit_depth,
+                        start_time=chunk_start_time,
                     )
                 )
 
@@ -315,6 +317,7 @@ class AudioProcessor:
                 chunk_duration_actual = len(chunk_audio) / sample_rate
                 logger.info(f"Chunk {chunk_idx} (final): start={start}, end={end}, duration={chunk_duration_actual:.2f}s, samples={len(chunk_audio)}")
                 print(f"Chunk {chunk_idx} (final): start={start}, end={end}, duration={chunk_duration_actual:.2f}s, samples={len(chunk_audio)}")
+                chunk_start_time = start / sample_rate
                 chunks.append(
                     AudioData(
                         audio_array=chunk_audio,
@@ -322,6 +325,7 @@ class AudioProcessor:
                         duration=chunk_duration_actual,
                         channels=audio_data.channels,
                         bit_depth=audio_data.bit_depth,
+                        start_time=chunk_start_time,
                     )
                 )
 
