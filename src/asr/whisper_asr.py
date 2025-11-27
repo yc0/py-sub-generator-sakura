@@ -1,10 +1,11 @@
 """Whisper ASR implementation using native Whisper generate() method."""
 
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 import re
 import torch
+import warnings
 
 from ..models.subtitle_data import SubtitleSegment
 from ..models.video_data import AudioData
@@ -189,7 +190,14 @@ class WhisperASR(LoggerMixin):
             pipeline_args["chunk_length_s"] = self.chunk_length_s
         pipeline_args.update(pipeline_kwargs)
 
-        self.pipe = pipeline("automatic-speech-recognition", **pipeline_args)
+        # Suppress the deprecation warning about return_token_timestamps
+        # The feature extractor will use attention_mask internally in future versions
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"`return_token_timestamps` is deprecated.*",
+            )
+            self.pipe = pipeline("automatic-speech-recognition", **pipeline_args)
 
         forced_decoder_ids = getattr(
             self.pipe.model.generation_config, "forced_decoder_ids", None
@@ -249,6 +257,7 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
         self.processor = None
         self.tokenizer = None
         self.feature_extractor = None
+        self.timestamp_logits_processor: Optional[WhisperTimeStampLogitsProcessor] = None
 
         # Device configuration
         self.torch_device = self._get_torch_device()
@@ -356,6 +365,11 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
 
             self.generation_config.update(valid_kwargs)
 
+            begin_index = 3  # skip BOS, language, and task tokens before timestamp tokens
+            self.timestamp_logits_processor = WhisperTimeStampLogitsProcessor(
+                self.model.generation_config, begin_index
+            )
+
             self.is_loaded = True
             self.logger.info(
                 f"Whisper model loaded successfully on {self.torch_device}"
@@ -408,7 +422,7 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
                 progress_callback(0.0)
 
             # Preprocess audio for Whisper
-            audio_features = self._preprocess_audio(audio_data)
+            audio_features, attention_mask = self._preprocess_audio(audio_data)
 
             if progress_callback:
                 progress_callback(0.2)
@@ -433,7 +447,7 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
             if audio_data.duration <= 30.0:
                 # Short audio - single pass (already padded to 30s)
                 segments = self._transcribe_single_pass(
-                    audio_features, forced_decoder_ids, progress_callback
+                    audio_features, attention_mask, forced_decoder_ids, progress_callback
                 )
             else:
                 # Long audio - process in 30-second chunks
@@ -456,7 +470,7 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
                 self.logger.debug(f"[ASR] segments empty. audio_data: duration={audio_data.duration}, sample_rate={audio_data.sample_rate}, shape={shape}")
                 # Log a sample of the input features for further diagnosis
                 try:
-                    audio_features = self._preprocess_audio(audio_data)
+                    audio_features, _ = self._preprocess_audio(audio_data)
                     self.logger.debug(f"[ASR] Sample of input features: {audio_features.flatten()[:10]}")
                 except Exception as e:
                     self.logger.error(f"[ASR] Could not log input features: {e}")
@@ -481,14 +495,14 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
             self.logger.error(f"Error during native transcription: {e}\nTraceback: {traceback.format_exc()}")
             return []
 
-    def _preprocess_audio(self, audio_data: AudioData) -> torch.Tensor:
+    def _preprocess_audio(self, audio_data: AudioData) -> Tuple[torch.Tensor, torch.Tensor]:
         """Preprocess audio data for Whisper feature extraction.
 
         Args:
             audio_data: Input audio data
 
         Returns:
-            Mel spectrogram features as torch tensor
+            Tuple of (mel spectrogram features, attention mask)
         """
         # Ensure audio is at correct sample rate
         if audio_data.sample_rate != self.sample_rate:
@@ -512,7 +526,10 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
 
         # Extract mel spectrogram features using Whisper's feature extractor
         features = self.feature_extractor(
-            audio_array, sampling_rate=self.sample_rate, return_tensors="pt"
+            audio_array,
+            sampling_rate=self.sample_rate,
+            return_tensors="pt",
+            return_attention_mask=True,
         )
 
         # Move to device and convert dtype
@@ -520,12 +537,26 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
             self.torch_device, dtype=self.torch_dtype
         )
 
-        return input_features
+        attention_mask = getattr(features, "attention_mask", None)
+        if attention_mask is None:
+            seq_len = input_features.shape[-1]
+            attention_mask = torch.ones(
+                (input_features.shape[0], seq_len),
+                device=self.torch_device,
+                dtype=torch.long,
+            )
+        else:
+            attention_mask = attention_mask.to(
+                self.torch_device, dtype=torch.long
+            )
+
+        return input_features, attention_mask
 
     def _transcribe_single_pass(
     
         self,
         audio_features: torch.Tensor,
+        attention_mask: torch.Tensor,
         forced_decoder_ids: list,
         progress_callback: Optional[Callable[[float], None]] = None,
     ) -> List[SubtitleSegment]:
@@ -534,6 +565,7 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
 
         Args:
             audio_features: Preprocessed audio features
+            attention_mask: Attention mask returned by the feature extractor
             forced_decoder_ids: Forced decoder IDs for language/task tokens
             progress_callback: Optional progress callback
 
@@ -545,12 +577,23 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
             generation_config = self.generation_config.copy()
             generation_config["forced_decoder_ids"] = forced_decoder_ids
 
-            # Create proper attention mask for input features
-            # For Whisper, the attention mask should be all 1s for the entire sequence
-            batch_size, n_mels, seq_len = audio_features.shape
-            attention_mask = torch.ones(
-                (batch_size, seq_len), device=self.torch_device, dtype=torch.long
-            )
+            if self.return_timestamps and self.timestamp_logits_processor:
+                existing_processors = generation_config.get("logits_processor")
+                if existing_processors:
+                    if isinstance(existing_processors, list):
+                        generation_config["logits_processor"] = [
+                            self.timestamp_logits_processor,
+                            *existing_processors,
+                        ]
+                    else:
+                        generation_config["logits_processor"] = [
+                            self.timestamp_logits_processor,
+                            existing_processors,
+                        ]
+                else:
+                    generation_config["logits_processor"] = [
+                        self.timestamp_logits_processor
+                    ]
 
             # Suppress attention mask warnings during generation (just in case)
             import warnings
@@ -628,11 +671,13 @@ class DeprecatedWhisperASR(BaseASR, LoggerMixin):
             )
 
             # Preprocess chunk
-            chunk_features = self._preprocess_audio(chunk_audio_data)
+            chunk_features, chunk_attention_mask = self._preprocess_audio(
+                chunk_audio_data
+            )
 
             # Transcribe chunk
             chunk_segments = self._transcribe_single_pass(
-                chunk_features, forced_decoder_ids
+                chunk_features, chunk_attention_mask, forced_decoder_ids
             )
 
             # Adjust timestamps with offset

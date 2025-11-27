@@ -202,6 +202,20 @@ Compatibility: Hardware-specific with universal fallback
 - **Advanced UI**: Additional customization options
 - **Model Management**: Automated model download and management
 
+## 🆕 Recent Updates (Nov 2025)
+
+- **VAD & ASR fixes**: WebRTC VAD default frame duration set to 30 ms to avoid zero-interval detection; VAD parameters (mode, padding, min segment duration) exposed in settings.
+- **Whisper warning handling**: Suppressed the `return_token_timestamps` deprecation warning while continuing to use the native `generate()` API for better timestamp handling.
+- **Prompt template system**: Added a modular prompt template system—templates live in `prompts/`, the Settings dialog lists available templates dynamically, and `SakuraTranslator` loads the selected template from config.
+- **Sakura translator initialization bug fix**: `create_from_config()` now passes the selected `prompt_template` to the translator so UI selections take effect.
+- **Documentation & tests**: Updated docs and verified key modules compile successfully. Some prompt template files were added under `prompts/` for initial styles.
+
+## ✅ Current Pending Tasks
+
+- Add more curated prompt templates or review existing templates in `prompts/`.
+- Run full end-to-end tests on representative long videos to validate VAD + ASR + translation flow.
+- Optional: Add unit tests for prompt template loading and translator initialization.
+
 ---
 
 ## 📊 **Commit History (Latest Session)**

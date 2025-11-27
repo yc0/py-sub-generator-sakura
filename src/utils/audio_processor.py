@@ -148,14 +148,20 @@ class AudioProcessor:
         try:
             import librosa
 
-            # Load audio file
+            # Load audio file (librosa returns float32 normalized between -1 and 1)
             audio_array, sample_rate = librosa.load(
                 str(audio_path), sr=self.target_sample_rate, mono=True
             )
 
             # Calculate duration
             duration = len(audio_array) / sample_rate
-            print(f"[DEBUG] Loaded audio: shape={audio_array.shape}, sample_rate={sample_rate}, duration={duration:.2f}s, expected_samples={int(duration*sample_rate)}")
+            logger.info(
+                "Loaded audio: %s, shape=%s, sample_rate=%dHz, duration=%.2fs, mono=True",
+                audio_path.name,
+                audio_array.shape,
+                sample_rate,
+                duration,
+            )
 
             return AudioData(
                 audio_array=audio_array,
@@ -335,3 +341,31 @@ class AudioProcessor:
         except Exception as e:
             logger.error(f"Error splitting audio: {e}")
             return [audio_data]
+
+    def slice_audio_segment(
+        self, audio_data: AudioData, start_time: float, end_time: float
+    ) -> Optional[AudioData]:
+        """Return a subsegment of the audio data between start and end times."""
+        start_time = max(0.0, start_time)
+        end_time = min(audio_data.duration, end_time)
+
+        if end_time <= start_time:
+            return None
+
+        sample_rate = audio_data.sample_rate
+        base_time = getattr(audio_data, "start_time", 0.0) or 0.0
+        start_offset = max(0.0, start_time - base_time)
+        end_offset = max(0.0, end_time - base_time)
+        start_sample = max(0, int(start_offset * sample_rate))
+        end_sample = min(len(audio_data.audio_array), int(end_offset * sample_rate))
+        segment_audio = audio_data.audio_array[start_sample:end_sample]
+        segment_duration = (end_sample - start_sample) / sample_rate
+
+        return AudioData(
+            audio_array=segment_audio,
+            sample_rate=sample_rate,
+            duration=segment_duration,
+            channels=audio_data.channels,
+            bit_depth=audio_data.bit_depth,
+            start_time=start_time,
+        )

@@ -2,6 +2,7 @@
 
 import logging
 import tkinter as tk
+from pathlib import Path
 from tkinter import messagebox, ttk
 
 from ...utils.config import Config
@@ -28,7 +29,6 @@ class SettingsDialog:
         self.dialog.title("Settings")
 
         # Calculate responsive dialog size based on screen resolution
-        screen_width = self.dialog.winfo_screenwidth()
         screen_height = self.dialog.winfo_screenheight()
 
         # Use 70% of screen height or minimum 700px, whichever is larger
@@ -42,28 +42,19 @@ class SettingsDialog:
         self.dialog.transient(parent)
         self.dialog.grab_set()
 
-        # Center on parent
+        self.create_widgets()
+        self.load_settings()
         self.center_on_parent()
 
-        # Create widgets
-        self.create_widgets()
-
-        # Load current settings
-        self.load_settings()
-
     def center_on_parent(self):
-        """Center dialog on parent window, ensuring it fits on screen."""
+        """Center dialog relative to the parent window."""
         self.dialog.update_idletasks()
 
-        # Get screen dimensions
         screen_width = self.dialog.winfo_screenwidth()
         screen_height = self.dialog.winfo_screenheight()
-
-        # Get dialog dimensions
         dialog_width = self.dialog.winfo_width()
         dialog_height = self.dialog.winfo_height()
 
-        # Try to center on parent if parent is visible
         try:
             parent_x = self.parent.winfo_rootx()
             parent_y = self.parent.winfo_rooty()
@@ -72,12 +63,10 @@ class SettingsDialog:
 
             x = parent_x + (parent_width // 2) - (dialog_width // 2)
             y = parent_y + (parent_height // 2) - (dialog_height // 2)
-        except:
-            # Fallback to screen center
+        except Exception:
             x = (screen_width // 2) - (dialog_width // 2)
             y = (screen_height // 2) - (dialog_height // 2)
 
-        # Ensure dialog stays within screen bounds
         x = max(0, min(x, screen_width - dialog_width))
         y = max(0, min(y, screen_height - dialog_height))
 
@@ -135,6 +124,25 @@ class SettingsDialog:
         
         # Fallback to default
         return "sakura-7b-v1.0"
+
+    def _get_available_prompt_templates(self):
+        """Get list of available prompt templates from prompts/ directory."""
+        prompts_dir = Path(__file__).parent.parent.parent.parent / "prompts"
+        
+        template_list = []
+        try:
+            if prompts_dir.exists():
+                # Get all .txt files in prompts directory and extract template names
+                txt_files = sorted(prompts_dir.glob("*.txt"))
+                template_list = [f.stem for f in txt_files]  # stem removes .txt extension
+        except Exception as e:
+            logger.warning(f"Failed to load prompt templates from {prompts_dir}: {e}")
+        
+        # Fallback to hardcoded list if no templates found
+        if not template_list:
+            template_list = ["standard", "dramatic", "literal", "creative"]
+        
+        return template_list
 
     def create_widgets(self):
         """Create dialog widgets."""
@@ -281,10 +289,79 @@ class SettingsDialog:
         )
         overlap_spin.grid(row=4, column=1, sticky=tk.W, padx=(10, 0), pady=5)
 
+        # VAD settings
+        vad_frame = ttk.LabelFrame(
+            frame, text="Voice Activity Detection (VAD)", padding="10"
+        )
+        vad_frame.grid(
+            row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(15, 5)
+        )
+        vad_frame.columnconfigure(1, weight=1)
+
+        self.vad_enabled_var = tk.BooleanVar()
+        vad_enable_cb = ttk.Checkbutton(
+            vad_frame,
+            text="Enable VAD (WebRTC)",
+            variable=self.vad_enabled_var,
+        )
+        vad_enable_cb.grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
+
+        ttk.Label(vad_frame, text="Mode (0-3):").grid(
+            row=1, column=0, sticky=tk.W, pady=5
+        )
+        self.vad_mode_var = tk.IntVar()
+        mode_spin = tk.Spinbox(
+            vad_frame, from_=0, to=3, textvariable=self.vad_mode_var, width=10
+        )
+        mode_spin.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+
+        ttk.Label(vad_frame, text="Frame Duration (ms):").grid(
+            row=2, column=0, sticky=tk.W, pady=5
+        )
+        self.vad_frame_duration_var = tk.IntVar()
+        frame_spin = tk.Spinbox(
+            vad_frame,
+            from_=10,
+            to=100,
+            increment=10,
+            textvariable=self.vad_frame_duration_var,
+            width=10,
+        )
+        frame_spin.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+
+        ttk.Label(vad_frame, text="Padding (ms):").grid(
+            row=3, column=0, sticky=tk.W, pady=5
+        )
+        self.vad_padding_var = tk.IntVar()
+        padding_spin = tk.Spinbox(
+            vad_frame,
+            from_=0,
+            to=1000,
+            increment=50,
+            textvariable=self.vad_padding_var,
+            width=10,
+        )
+        padding_spin.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+
+        ttk.Label(vad_frame, text="Min Segment Duration (s):").grid(
+            row=4, column=0, sticky=tk.W, pady=5
+        )
+        self.vad_min_segment_var = tk.DoubleVar()
+        min_segment_spin = tk.Spinbox(
+            vad_frame,
+            from_=0.1,
+            to=2.0,
+            increment=0.1,
+            format="%.1f",
+            textvariable=self.vad_min_segment_var,
+            width=10,
+        )
+        min_segment_spin.grid(row=4, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+
         # Native Whisper info
         info_frame = ttk.Frame(frame)
         info_frame.grid(
-            row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(15, 5)
+            row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(15, 5)
         )
 
         info_label = ttk.Label(
@@ -516,6 +593,30 @@ class SettingsDialog:
         )
         template_check.grid(row=1, column=0, sticky=tk.W, pady=2)
 
+        # Prompt template selection
+        ttk.Label(self.sakura_frame, text="Prompt Template Style:").grid(
+            row=5, column=0, sticky=tk.W, pady=5
+        )
+        self.sakura_prompt_template_var = tk.StringVar()
+        available_templates = self._get_available_prompt_templates()
+        prompt_template_combo = ttk.Combobox(
+            self.sakura_frame,
+            textvariable=self.sakura_prompt_template_var,
+            values=available_templates,
+            state="readonly",
+        )
+        prompt_template_combo.grid(row=5, column=1, sticky=(tk.W, tk.E), padx=(10, 0), pady=5)
+
+        # Prompt template description
+        templates_list = ", ".join(available_templates)
+        prompt_desc = ttk.Label(
+            self.sakura_frame,
+            text=f"💡 Choose the style of translation prompt ({templates_list})",
+            foreground="blue",
+            font=("TkDefaultFont", 8),
+        )
+        prompt_desc.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
+
         self.sakura_frame.columnconfigure(1, weight=1)
 
         frame.columnconfigure(0, weight=1)
@@ -721,6 +822,12 @@ class SettingsDialog:
             self.asr_batch_var.set(asr_config.get("batch_size", 1))
             self.asr_chunk_var.set(asr_config.get("chunk_length", 30))
             self.asr_overlap_var.set(asr_config.get("overlap", 0.5))
+            vad_config = asr_config.get("vad", {})
+            self.vad_enabled_var.set(vad_config.get("enabled", True))
+            self.vad_mode_var.set(vad_config.get("mode", 3))
+            self.vad_frame_duration_var.set(vad_config.get("frame_duration_ms", 30))
+            self.vad_padding_var.set(vad_config.get("padding_ms", 300))
+            self.vad_min_segment_var.set(vad_config.get("min_segment_duration", 0.5))
 
             # Translation settings
             trans_config = self.config.get_translation_config()
@@ -754,6 +861,9 @@ class SettingsDialog:
             self.sakura_force_gpu_var.set(sakura_config.get("force_gpu", True))
             self.sakura_chat_template_var.set(
                 sakura_config.get("use_chat_template", True)
+            )
+            self.sakura_prompt_template_var.set(
+                sakura_config.get("prompt_template", "standard")
             )
 
             # Update frame states based on selected method
@@ -803,6 +913,16 @@ class SettingsDialog:
             self.config.set("asr.batch_size", self.asr_batch_var.get())
             self.config.set("asr.chunk_length", self.asr_chunk_var.get())
             self.config.set("asr.overlap", self.asr_overlap_var.get())
+            self.config.set("asr.vad.enabled", self.vad_enabled_var.get())
+            self.config.set("asr.vad.mode", self.vad_mode_var.get())
+            self.config.set(
+                "asr.vad.frame_duration_ms", self.vad_frame_duration_var.get()
+            )
+            self.config.set("asr.vad.padding_ms", self.vad_padding_var.get())
+            self.config.set(
+                "asr.vad.min_segment_duration",
+                self.vad_min_segment_var.get(),
+            )
 
             # Translation settings
             self.config.set("translation.ja_to_en_model", self.ja_en_model_var.get())
@@ -829,6 +949,9 @@ class SettingsDialog:
             self.config.set("sakura.force_gpu", self.sakura_force_gpu_var.get())
             self.config.set(
                 "sakura.use_chat_template", self.sakura_chat_template_var.get()
+            )
+            self.config.set(
+                "sakura.prompt_template", self.sakura_prompt_template_var.get()
             )
 
             # Output settings

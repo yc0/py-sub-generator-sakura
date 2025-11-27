@@ -12,6 +12,8 @@ from ..utils.audio_processor import AudioProcessor
 from ..utils.config import Config
 from ..utils.file_handler import FileHandler
 from ..utils.logger import LoggerMixin
+from ..utils.scene_detector import SceneDetector
+from ..utils.vad_processor import VADProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,23 @@ class SubtitleGenerator(LoggerMixin):
 
         # Initialize translation pipeline
         self.translation_pipeline = TranslationPipeline(config)
+
+        scene_config = self.config.get_scene_detection_config()
+        self.scene_detector = SceneDetector(
+            enabled=scene_config.get("enabled", True),
+            threshold=scene_config.get("threshold", 0.35),
+            min_scene_length=scene_config.get("min_scene_length", 1.0),
+            max_scenes=scene_config.get("max_scenes", 60),
+        )
+
+        vad_config = self.config.get_vad_config()
+        self.vad_processor = VADProcessor(
+            enabled=vad_config.get("enabled", True),
+            mode=vad_config.get("mode", 3),
+            frame_duration_ms=vad_config.get("frame_duration_ms", 30),
+            padding_ms=vad_config.get("padding_ms", 300),
+            min_segment_duration=vad_config.get("min_segment_duration", 0.5),
+        )
 
         # Processing state
         self.current_video = None
@@ -88,11 +107,23 @@ class SubtitleGenerator(LoggerMixin):
             if progress_callback:
                 progress_callback("audio_extraction", 1.0)
 
-            # Stage 3: Perform ASR
+            # Stage 3: Prepare scenes and speech chunks
+            if progress_callback:
+                progress_callback("scene_detection", 0.0)
+            scene_audio_chunks = self._prepare_scene_audio_chunks(audio_data, video_file)
+            if progress_callback:
+                progress_callback("scene_detection", 1.0)
+
+            if not scene_audio_chunks:
+                self.logger.error("No valid speech chunks after scene/VAD processing")
+                return None
+
+            # Stage 4: Perform ASR
             if progress_callback:
                 progress_callback("asr", 0.0)
             segments = self._perform_asr(
                 audio_data,
+                audio_chunks=scene_audio_chunks,
                 progress_callback=progress_callback,
             )
             # Defensive: log and check types before boolean check
@@ -201,15 +232,55 @@ class SubtitleGenerator(LoggerMixin):
             self.logger.error(f"Error extracting audio: {e}")
             return None
 
+    def _prepare_scene_audio_chunks(
+        self, audio_data: AudioData, video_file: VideoFile
+    ) -> List[AudioData]:
+        """Return speech-only audio segments split by scenes."""
+        scene_segments = self.scene_detector.detect_scenes(video_file)
+        chunks: List[AudioData] = []
+
+        for scene in scene_segments:
+            scene_chunk = self.audio_processor.slice_audio_segment(
+                audio_data, scene.start_time, scene.end_time
+            )
+            if not scene_chunk or scene_chunk.duration <= 0 or scene_chunk.audio_array.size == 0:
+                continue
+
+            speech_chunks = self._apply_vad_to_chunk(scene_chunk)
+            chunks.extend(speech_chunks)
+
+        return chunks
+
+    def _apply_vad_to_chunk(self, audio_chunk: AudioData) -> List[AudioData]:
+        """Apply VAD on a scene chunk and return speech regions."""
+        if not self.vad_processor.enabled:
+            return [audio_chunk]
+
+        intervals = self.vad_processor.get_speech_intervals(audio_chunk)
+        speech_segments: List[AudioData] = []
+
+        for start, end in intervals:
+            absolute_start = audio_chunk.start_time + start
+            absolute_end = audio_chunk.start_time + end
+            segment = self.audio_processor.slice_audio_segment(
+                audio_chunk, absolute_start, absolute_end
+            )
+            if segment:
+                speech_segments.append(segment)
+
+        return speech_segments
+
     def _perform_asr(
         self,
         audio_data: AudioData,
+        audio_chunks: Optional[List[AudioData]] = None,
         progress_callback: Optional[Callable[[str, float], None]] = None,
     ) -> List[SubtitleSegment]:
         """Perform automatic speech recognition on audio.
 
         Args:
             audio_data: AudioData to transcribe
+            audio_chunks: Optional list of pre-sliced audio segments (scenes + VAD)
             progress_callback: Optional progress callback (stage, progress)
 
         Returns:
@@ -221,33 +292,37 @@ class SubtitleGenerator(LoggerMixin):
                 self.logger.error("Failed to load ASR model")
                 return []
 
-            # Check if we need to split audio into chunks
-            chunk_length = self.config.get("asr.chunk_length", 8)  # Reduced for Japanese content
-            overlap = self.config.get("asr.overlap", 0.5)  # Reduced overlap
-
-            if (
-                audio_data.duration > chunk_length * 1.5
-            ):  # Use chunking for longer audio
-                self.logger.info(f"Using chunked ASR: {chunk_length}s chunks with {overlap}s overlap")
-
-                # Split audio into chunks
-                audio_chunks = self.audio_processor.split_audio_chunks(
-                    audio_data, chunk_duration=chunk_length, overlap=overlap
-                )
-
-                # Transcribe chunks
+            if audio_chunks:
+                self.logger.info("Running ASR on scene/VAD speech chunks")
                 segments = self.asr.transcribe_batch(
                     audio_chunks,
                     language=self.config.get("asr.language", "ja"),
                     progress_callback=progress_callback,
                 )
             else:
-                # Process entire audio at once
-                segments = self.asr.transcribe_audio(
-                    audio_data,
-                    language=self.config.get("asr.language", "ja"),
-                    progress_callback=progress_callback,
-                )
+                chunk_length = self.config.get("asr.chunk_length", 8)  # Reduced for Japanese content
+                overlap = self.config.get("asr.overlap", 0.5)  # Reduced overlap
+
+                if audio_data.duration > chunk_length * 1.5:
+                    self.logger.info(
+                        f"Using chunked ASR: {chunk_length}s chunks with {overlap}s overlap"
+                    )
+
+                    chunked_audio = self.audio_processor.split_audio_chunks(
+                        audio_data, chunk_duration=chunk_length, overlap=overlap
+                    )
+
+                    segments = self.asr.transcribe_batch(
+                        chunked_audio,
+                        language=self.config.get("asr.language", "ja"),
+                        progress_callback=progress_callback,
+                    )
+                else:
+                    segments = self.asr.transcribe_audio(
+                        audio_data,
+                        language=self.config.get("asr.language", "ja"),
+                        progress_callback=progress_callback,
+                    )
 
             # Post-process segments for better subtitle readability
             segments = self._post_process_subtitle_segments(segments)

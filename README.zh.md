@@ -14,6 +14,20 @@
 - **💾 多種匯出格式**：SRT 字幕匯出，計劃支援更多格式
 - **⚡ GPU 優先設計**：針對 NVIDIA CUDA 和 Apple Silicon MPS 加速最佳化
 
+## 🆕 最近更新（2025年11月）
+
+- **VAD 改進與 UI 控制**：更新 WebRTC VAD 預設（`frame_duration_ms=30`），並在設定對話框中新增 VAD 參數（啟用、模式、frame duration、padding、最短段落長度）以便於在運行時調整。
+- **Whisper ASR 穩定性**：壓制與 `return_token_timestamps` 相關的棄用警告，同時保留 Whisper 原生的 `generate()` 使用以獲得可靠的時間戳與無 token 限制行為。
+- **模組化提示模板（Prompt Templates）**：提示模板現存放於 `prompts/` 目錄；SakuraLLM 會從設定中載入選定模板，設定視窗會動態列出 `prompts/` 中可用的模板。
+- **SakuraLLM 提示流程修正**：修正 `SakuraTranslator.create_from_config()`，會將設定中的 `prompt_template` 傳入翻譯器，確保使用者在 UI 選擇的模板會被實際套用。
+- **UI 與設定修正**：修復設定對話框佈局、強化設定儲存/載入的可靠性以及提供更穩健的預設值。
+
+## 🐞 修正（2025年11月）
+
+- **VAD 無語音區段問題**：解決 WebRTC VAD 回傳 0 語音區段的情況，透過限制支援的 WebRTC frame duration（10/20/30 ms）並對長內容預設為 30 ms。
+- **提示模板選擇錯誤**：修正翻譯器初始化流程，確保 UI 選擇的非 `standard` 模板會被使用。
+- **語法與編譯問題**：修正零星語法錯誤並以 `python -m py_compile` 驗證模組可編譯。
+
 ## 🎯 GPU 加速優先
 
 本專案採用 **GPU 優先** 設計，針對硬體加速進行最佳化：

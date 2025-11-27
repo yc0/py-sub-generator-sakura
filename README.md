@@ -14,6 +14,20 @@ A powerful, well-architected application for generating Japanese subtitles with 
 - **💾 Multiple Export Formats**: SRT subtitle export with more formats planned
 - **⚡ GPU-First Design**: Optimized for NVIDIA CUDA and Apple Silicon MPS acceleration
 
+## 🆕 Recent New Features (Nov 2025)
+
+- **VAD Improvements & UI Controls**: WebRTC VAD tuning updated (default `frame_duration_ms=30`) and VAD parameters (enable, mode, frame duration, padding, min segment duration) exposed in the Settings dialog for easy runtime tuning.
+- **Whisper ASR stability**: Suppressed a deprecation warning related to `return_token_timestamps` while keeping native Whisper `generate()` usage for reliable timestamps and no token-limit behavior.
+- **Modular Prompt Templates**: Prompt templates are now stored under `prompts/`; the SakuraLLM translator loads the selected template from config. The Settings dialog dynamically lists templates available in `prompts/`.
+- **SakuraLLM Prompt Flow Fixed**: `SakuraTranslator.create_from_config()` now passes the configured prompt template style to the translator so the chosen template is actually used during translation.
+- **UI & Config Fixes**: Settings dialog layout fixes, persistent config saving/loading for new options, and safer default fallbacks.
+
+## 🐞 Bug Fixes (Nov 2025)
+
+- **VAD zero-interval issue**: Resolved the case where VAD reported 0 speech intervals by enforcing supported WebRTC frame durations (10/20/30 ms) and defaulting to 30 ms for long-form content.
+- **Prompt template selection bug**: Fixed translator initialization so non-`standard` templates selected in the UI are applied correctly.
+- **Syntax & compile fixes**: Cleaned stray syntax errors and verified modules compile with `python -m py_compile`.
+
 ## 🎯 GPU Acceleration Focus
 
 This project is **GPU-first** and optimized for hardware acceleration:

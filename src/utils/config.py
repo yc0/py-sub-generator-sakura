@@ -1,12 +1,4 @@
-"""Configuration        "asr": {
-    "model_name": "openai/whisper-large-v3",  # Default Whisper model
-    "device": "auto",  # auto, cpu, cuda, mps (Apple Silicon)
-    "batch_size": 1,
-    "language": "ja",  # Japanese
-    "return_timestamps": True,
-    "chunk_length": 30,  # seconds
-    "overlap": 1.0  # seconds
-},nt for the application."""
+"""Configuration management for the application."""
 
 import json
 import logging
@@ -31,6 +23,13 @@ class Config:
             "overlap": 0.5,  # Reduced overlap for cleaner subtitle transitions
             "max_subtitle_length": 25,  # Maximum characters per subtitle segment
             "subtitle_display_duration": 2.5,  # Minimum display time in seconds
+            "vad": {
+                "enabled": True,
+                "mode": 3,
+                "frame_duration_ms": 30,
+                "padding_ms": 300,
+                "min_segment_duration": 0.5,
+            },
         },
         "translation": {
             "ja_to_en_model": "Helsinki-NLP/opus-mt-ja-en",
@@ -38,6 +37,29 @@ class Config:
             "device": "auto",  # auto, cpu, cuda, mps (Apple Silicon)
             "batch_size": 8,
             "max_length": 512,
+        },
+        "hallucination_filter": {
+            "enabled": True,
+            "confidence_threshold": 0.35,
+            "max_length_ratio": 4.0,
+            "min_length_ratio": 0.25,
+            "blacklist": [
+                r"^\.{2,}$",
+                r"^…+$",
+                r"^\[.*\]$",
+                r"^[0-9\s\-]*$",
+            ],
+            "whitelist_patterns": [
+                r"[\u4e00-\u9fff]",
+                r"[a-zA-Z]+",
+                r"[\u3040-\u30ff]",
+            ],
+        },
+        "scene_detection": {
+            "enabled": True,
+            "threshold": 0.35,
+            "min_scene_length": 1.0,
+            "max_scenes": 60,
         },
         "sakura": {
             # SakuraLLM configuration for high-quality Japanese translation
@@ -54,6 +76,7 @@ class Config:
             "torch_dtype": "float16",  # Use float16 for memory efficiency
             "force_gpu": True,  # Require GPU for large models
             "use_chat_template": True,  # Use chat template for better results
+            "prompt_template": "standard",  # Prompt template style (standard, dramatic, literal, creative)
             # Available SakuraLLM models (latest versions only)
             "available_models": {
                 "sakura-7b-v1.0": {
@@ -202,6 +225,18 @@ class Config:
     def get_asr_config(self) -> Dict[str, Any]:
         """Get ASR-specific configuration."""
         return self.config.get("asr", {})
+
+    def get_vad_config(self) -> Dict[str, Any]:
+        """Get Voice Activity Detection configuration."""
+        return self.config.get("asr", {}).get("vad", {})
+
+    def get_scene_detection_config(self) -> Dict[str, Any]:
+        """Get scene detection configuration."""
+        return self.config.get("scene_detection", {})
+
+    def get_hallucination_filter_config(self) -> Dict[str, Any]:
+        """Get hallucination filter configuration."""
+        return self.config.get("hallucination_filter", {})
 
     def get_translation_config(self) -> Dict[str, Any]:
         """Get translation-specific configuration."""

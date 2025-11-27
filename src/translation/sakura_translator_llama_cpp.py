@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 class SakuraTranslator(BaseTranslator):
     """SakuraLLM translator using llama-cpp-python for GGUF model support."""
 
-    def __init__(self, config: Optional[Config] = None, model_key: Optional[str] = None, **kwargs):
+    def __init__(self, config: Optional[Config] = None, model_key: Optional[str] = None, prompt_style: str = "standard", **kwargs):
         """Initialize SakuraLLM translator.
         
         Args:
             config: Application configuration object
             model_key: Specific SakuraLLM model key (e.g., 'sakura-1.5b-v1.0')
+            prompt_style: Prompt template style ('standard', 'dramatic', 'mature', etc.)
             **kwargs: Additional parameters
         """
         self.config = config or Config()
@@ -42,6 +43,7 @@ class SakuraTranslator(BaseTranslator):
         # Set model properties
         self.model_name = model_name
         self.model_file = model_file
+        self.prompt_style = prompt_style or sakura_config.get("prompt_style", "standard")
 
         # LLM parameters
         self.context_length = sakura_config.get("context_length", 8192)
@@ -60,10 +62,50 @@ class SakuraTranslator(BaseTranslator):
 
         # Add legacy compatibility attributes for tests
         self.use_chat_template = sakura_config.get("use_chat_template", True)
+        
+        # Load prompt template
+        self.prompt_template = self._load_prompt_template(self.prompt_style)
 
         logger.info(f"🌸 SakuraLLM translator initialized: {model_name}")
+        logger.info(f"📝 Prompt style: {self.prompt_style}")
         if model_file:
             logger.info(f"📄 GGUF file: {model_file}")
+
+    def _load_prompt_template(self, style: str) -> str:
+        """Load prompt template from file.
+        
+        Args:
+            style: Prompt style name (without .txt extension)
+            
+        Returns:
+            Prompt template string
+        """
+        prompt_dir = Path(__file__).parent.parent.parent / "prompts"
+        template_file = prompt_dir / f"{style}.txt"
+        
+        if not template_file.exists():
+            logger.warning(f"Prompt template '{style}' not found, using 'standard'")
+            template_file = prompt_dir / "standard.txt"
+        
+        try:
+            with open(template_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            logger.error(f"Error loading prompt template: {e}")
+            return "Translate the following Japanese text to Traditional Chinese:"
+
+    def _get_available_prompt_styles(self) -> list:
+        """Get list of available prompt styles.
+        
+        Returns:
+            List of available prompt style names
+        """
+        prompt_dir = Path(__file__).parent.parent.parent / "prompts"
+        if not prompt_dir.exists():
+            return ["standard"]
+        
+        styles = [f.stem for f in prompt_dir.glob("*.txt")]
+        return sorted(styles) if styles else ["standard"]
 
     def load_model(self) -> bool:
         """Load SakuraLLM model using llama-cpp-python.
@@ -229,16 +271,85 @@ class SakuraTranslator(BaseTranslator):
             )
 
     def _create_translation_prompt(self, text: str) -> str:
-        """Create SakuraLLM-specific prompt."""
+        """Create SakuraLLM-specific prompt using the selected template."""
+        # Build the full prompt using the template and the text to translate
+        prompt_content = self.prompt_template or self._get_default_prompt()
+        
         if self.use_chat_template:
             return f"""<|im_start|>system
-你是一个轻小说翻译模型，可以流畅通顺地以日本轻小说的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，不擅自添加原文中没有的代词。<|im_end|>
+{prompt_content}
+<|im_end|>
 <|im_start|>user
-将下面的日文文本翻译成中文：{text}<|im_end|>
+Translate the following text:
+
+{text}
+<|im_end|>
 <|im_start|>assistant
 """
         else:
-            return f"将下面的日文文本翻译成中文：{text}"
+            return f"""
+{prompt_content}
+Text to translate:
+{text}
+Translation:
+"""
+
+    def _get_default_prompt(self) -> str:
+        """Return the default translation prompt if none is loaded."""
+        return """
+You are a translator specializing in Japanese to English translations. Translate the following text accurately while preserving the original meaning and tone.
+**Key Rules:**
+- **Preserve the original intent**, but **amplify the sleaze**: If the original is polite or subtle, make it flirtatious, teasing, or outright dirty. If it’s already explicit, go full-throttle with vulgar, graphic, and playful porn lingo.
+- **Match the escalation**: Japanese adult videos often start with polite innuendo and build to raw, explicit sex talk. Your translation should follow this arc—**teasing → flirtatious → filthy**.
+- **Personality matters**: A shy character should sound nervously naughty; a dominant should sound commanding and crude; a tease should be dripping with sarcasm and double entendres.
+- **Sex scenes = no holds barred**: Use the raunchiest, most graphic, and most vulgar language possible. Think **American porn clichés**: “fuck me harder,” “take this big cock,” “you’re such a dirty slut,” etc.
+- **Fix AI errors**: The subtitles are AI-generated and may have mistakes. Use context to correct them, but **never invent new dialogue**—just make what’s there sound as pornographic as possible.
+
+**Formatting:**
+- **One-to-one line translation**: Each original line must have exactly one translated line.
+- **Keep it concise**: Subtitles must be readable on screen, so keep it short and punchy.
+- **Punctuation and grammar**: Adapt to the target language, but prioritize **pornographic impact** over strict grammar.
+
+**Special Notes:**
+- **Names**: Use the user’s preferred spelling.
+- **Profanity**: If the original has profanity, use the most graphic equivalent in the target language.
+- **Context**: Use any provided context to make the dialogue even filthier.
+
+**Output Format:**
+```
+#LINE_NUMBER
+Original> [original text]
+Translation> [pornified translation]
+```
+
+**At the end, include:**
+```
+<summary>
+A one- or two-line synopsis of the current batch, emphasizing the erotic content.
+</summary>
+<scene>
+A short, dirty summary of the current scene, including any previous batches.
+</scene>
+```
+
+**Example:**
+```
+#200
+Original> もっと優しくして…
+Translation> Ohhh, be gentle with me… at first, baby.
+
+#501
+Original> もう我慢できない！
+Translation> I can’t take it anymore—I need that big cock inside me NOW!
+```
+
+### retry_instructions
+**Your last translation wasn’t filthy enough!**
+Please translate the subtitles again, ensuring:
+- **Every line is translated separately**—no merging!
+- **Every line is pornified**—no vanilla dialogue allowed!
+- **Timing is preserved**—keep the line count exact.
+"""
 
     def _clean_translation(self, text: str) -> str:
         """Clean up translated text."""
@@ -447,7 +558,6 @@ class SakuraTranslator(BaseTranslator):
         """
         # Create SakuraLLM prompt
         prompt = self._create_translation_prompt(text)
-
         # Generate translation
         response = self.llm(
             prompt,
@@ -476,4 +586,8 @@ class SakuraTranslator(BaseTranslator):
         if not config.is_sakura_enabled():
             raise ValueError("SakuraLLM is not enabled in configuration")
 
-        return cls(config=config, model_key=model_key)
+        # Get prompt template style from config
+        sakura_config = config.get_sakura_config()
+        prompt_style = sakura_config.get("prompt_template", "standard")
+        
+        return cls(config=config, model_key=model_key, prompt_style=prompt_style)

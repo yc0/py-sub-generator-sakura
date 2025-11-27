@@ -10,6 +10,7 @@ from src.utils.chinese_converter import convert_to_traditional
 from ..models.subtitle_data import SubtitleFile, SubtitleSegment, TranslationResult
 from ..utils.config import Config
 from ..utils.logger import LoggerMixin
+from ..utils.hallucination_filter import HallucinationFilter
 from .huggingface_translator import MultiStageTranslator
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ class TranslationPipeline(LoggerMixin):
         self.config = config
         self.translation_config = config.get_translation_config()
         self.sakura_config = config.get_sakura_config()
+        self.hallucination_filter = HallucinationFilter(
+            **config.get_hallucination_filter_config()
+        )
 
         # Initialize translators
         self.multi_stage_translator = None
@@ -206,7 +210,13 @@ class TranslationPipeline(LoggerMixin):
             # Add translations to subtitle file
             for lang_code, results in translation_results.items():
                 if lang_code in target_languages and results:
-                    subtitle_file.add_translation(lang_code, results)
+                    filtered_results = self._apply_hallucination_filter(lang_code, results)
+                    if filtered_results:
+                        subtitle_file.add_translation(lang_code, filtered_results)
+                    else:
+                        self.logger.warning(
+                            "All translations for %s removed by hallucination filter", lang_code
+                        )
                     self.logger.info(
                         f"Added {len(results)} translations for {lang_code}"
                     )
@@ -378,6 +388,13 @@ class TranslationPipeline(LoggerMixin):
             Dictionary mapping language codes to names
         """
         return {"ja": "Japanese", "en": "English", "zh": "Traditional Chinese"}
+
+    def _apply_hallucination_filter(
+        self, language: str, results: List[TranslationResult]
+    ) -> List[TranslationResult]:
+        if not self.hallucination_filter:
+            return results
+        return self.hallucination_filter.filter(results, language)
 
     def unload_models(self):
         """Unload all translation models to free memory."""

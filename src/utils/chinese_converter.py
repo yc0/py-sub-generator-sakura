@@ -54,7 +54,7 @@ class ChineseConverter:
             converted_count = sum(1 for s, t in zip(text, converted_text) if s != t)
 
             if converted_count > 0:
-                logger.info(f"OpenCC converted {converted_count} characters from Simplified to Traditional")
+                logger.debug(f"OpenCC converted {converted_count} characters from Simplified to Traditional")
 
             return converted_text
         except Exception as e:
@@ -101,7 +101,7 @@ class ChineseConverter:
                 converted_text += char
 
         if converted_count > 0:
-            logger.info(f"Basic conversion: {converted_count} characters from Simplified to Traditional Chinese")
+            logger.debug(f"Basic conversion: {converted_count} characters from Simplified to Traditional Chinese")
 
         return converted_text
 
